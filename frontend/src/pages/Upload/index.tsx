@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getUsers, uploadCall } from '../../api/client';
-import { User } from '../../types';
+import type { User } from '../../types';
 import {
   Box, Typography, Paper, Button, Select, MenuItem, FormControl, InputLabel,
   Alert, LinearProgress,

@@ -13,8 +13,8 @@ export default function GDriveSyncPage() {
     setResult(null);
     setError(null);
     try {
-      const data = await api.post('/gdrive/sync');
-      setResult(`Импортировано: ${data.imported} файлов`);
+      const resp = await api.post('/gdrive/sync');
+      setResult(`Импортировано: ${resp.data.imported} файлов`);
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Ошибка синхронизации');
     } finally {

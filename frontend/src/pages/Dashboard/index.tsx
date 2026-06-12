@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDashboard, getCalls } from '../../api/client';
-import { DashboardStats, Call } from '../../types';
+import type { DashboardStats, Call } from '../../types';
 import {
   Box, Grid, Typography, Paper, Chip, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, CircularProgress, Alert,
@@ -86,7 +86,7 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <Typography color="grey.500" textAlign="center" py={4}>Нет данных</Typography>
+              <Typography sx={{ color: "grey.500", textAlign: "center", py: 4 }}>Нет данных</Typography>
             )}
           </Paper>
         </Grid>
@@ -107,7 +107,7 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <Typography color="grey.500" textAlign="center" py={4}>Нет данных</Typography>
+                <Typography sx={{ color: "grey.500", textAlign: "center", py: 4 }}>Нет данных</Typography>
               )}
             </Paper>
           </Grid>

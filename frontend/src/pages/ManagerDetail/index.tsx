@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getManagerDetail } from '../../api/client';
-import { ManagerDetail as ManagerDetailType } from '../../types';
+import type { ManagerDetail as ManagerDetailType } from '../../types';
 import {
   Box, Typography, Paper, Grid, Chip, CircularProgress, Alert, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import StatCard from '../../components/StatCard';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function ManagerDetailPage() {
   const { id } = useParams<{ id: string }>();

@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUsers } from '../../api/client';
 import { getDashboard } from '../../api/client';
-import { User, DashboardStats } from '../../types';
+import type { User, DashboardStats } from '../../types';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Chip, CircularProgress, Alert,
+  TableRow, Chip, CircularProgress,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -73,7 +73,7 @@ export default function UsersPage() {
                     onClick={() => navigate(`/users/${u.id}`)}
                   >
                     <TableCell>
-                      <Typography fontWeight={600}>{u.username}</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>{u.username}</Typography>
                     </TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell>{ms?.processed_calls ?? 0} / {ms?.total_calls ?? 0}</TableCell>

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { getCalls, getCall } from '../../api/client';
-import { Call } from '../../types';
+import type { Call } from '../../types';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Chip, TablePagination, CircularProgress, Alert, Dialog, DialogTitle,
-  DialogContent, IconButton, Button, Grid,
+  TableRow, Chip, TablePagination, CircularProgress, Dialog, DialogTitle,
+  DialogContent, IconButton, Grid,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -16,7 +16,6 @@ export default function CallsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const pageSize = 20;
 
