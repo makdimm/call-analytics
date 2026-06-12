@@ -6,7 +6,7 @@ import os
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Call Analytics"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://callanalytics:callanalytics@db:5432/callanalytics"
@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     # Google Drive
     GOOGLE_DRIVE_CREDENTIALS_PATH: str = ""
+    GOOGLE_DRIVE_FOLDER_ID: str = ""
+    GOOGLE_DRIVE_POLL_INTERVAL: int = 300  # seconds
 
     # Paths
     AUDIO_DIR: str = "/app/audio"

@@ -59,4 +59,7 @@ export const getDashboard = (days = 30) =>
 export const getManagerDetail = (managerId: number, days = 30) =>
   api.get(`/analytics/managers/${managerId}`, { params: { days } }).then((r) => r.data);
 
+// Seed (dev only)
+export const seedDev = () => api.post('/seed').then((r) => r.data);
+
 export default api;

@@ -10,6 +10,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PhoneIcon from '@mui/icons-material/Phone';
 import PeopleIcon from '@mui/icons-material/People';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 
@@ -39,6 +40,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     { text: 'Дашборд', icon: <DashboardIcon />, path: '/' },
     { text: 'Звонки', icon: <PhoneIcon />, path: '/calls' },
     ...(isAdmin ? [{ text: 'Загрузить', icon: <CloudUploadIcon />, path: '/upload' }] : []),
+    ...(isAdmin ? [{ text: 'Google Drive', icon: <CloudSyncIcon />, path: '/gdrive' }] : []),
     ...(isAdmin ? [{ text: 'Менеджеры', icon: <PeopleIcon />, path: '/users' }] : []),
   ];
 
