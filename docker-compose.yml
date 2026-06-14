@@ -1,16 +1,12 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: callanalytics
-      POSTGRES_PASSWORD: callanalytics
+      POSTGRES_PASSWORD: c754616fb7dfd37f1d2d04a1407ba814
       POSTGRES_DB: callanalytics
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U callanalytics"]
       interval: 5s
@@ -20,19 +16,14 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     restart: unless-stopped
 
   backend:
     build: ./backend
     env_file: ./backend/.env
     volumes:
-      - ./backend:/app
       - audio_data:/app/audio
       - upload_data:/app/uploads
-    ports:
-      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -44,26 +35,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     restart: unless-stopped
-
-  # Dev — запускать с профилем: docker compose --profile dev up
-  frontend-dev:
-    profile: dev
-    image: node:20-alpine
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
-    volumes:
-      - ./frontend:/app
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
 
 volumes:
   pgdata:

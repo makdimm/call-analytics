@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useRef, ReactNode, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 
 interface WebSocketContextType {
@@ -14,7 +15,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<any>(null);
-  const reconnectRef = useRef<number>();
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { token } = useAuth();
 
   useEffect(() => {
@@ -22,11 +23,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     const connect = () => {
       try {
-        const ws = new WebSocket(`${WS_URL}?token=${token}`);
+        const ws = new WebSocket(WS_URL);
 
         ws.onopen = () => {
           setConnected(true);
-          console.log('[WS] Connected');
         };
 
         ws.onmessage = (event) => {
@@ -38,21 +38,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
         ws.onclose = () => {
           setConnected(false);
-          console.log('[WS] Disconnected, reconnecting in 5s...');
-          reconnectRef.current = window.setTimeout(connect, 5000);
+          reconnectTimer.current = setTimeout(connect, 5000);
         };
 
         ws.onerror = () => ws.close();
         wsRef.current = ws;
       } catch {
-        reconnectRef.current = window.setTimeout(connect, 5000);
+        reconnectTimer.current = setTimeout(connect, 5000);
       }
     };
 
     connect();
 
     return () => {
-      clearTimeout(reconnectRef.current);
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close();
     };
   }, [token]);

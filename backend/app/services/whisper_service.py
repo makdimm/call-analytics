@@ -14,7 +14,7 @@ def get_whisper_model() -> WhisperModel:
             settings.WHISPER_MODEL_SIZE,
             device="cpu",
             compute_type="int8",
-            cpu_threads=4,
+            cpu_threads=6,
             num_workers=2,
         )
     return _model
@@ -27,6 +27,8 @@ async def transcribe_audio(file_path: str) -> dict:
     segments, info = model.transcribe(
         file_path,
         beam_size=5,
+        best_of=5,
+        temperature=[0.0, 0.2, 0.4, 0.6],
         vad_filter=True,
         vad_parameters=dict(
             threshold=0.5,
@@ -34,6 +36,8 @@ async def transcribe_audio(file_path: str) -> dict:
             max_speech_duration_s=3600,
         ),
         language="ru",
+        condition_on_previous_text=True,
+        word_timestamps=False,
     )
 
     segments_list = list(segments)

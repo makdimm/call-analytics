@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUsers } from '../../api/client';
-import { getDashboard } from '../../api/client';
-import { User, DashboardStats } from '../../types';
+import { getUsers, getDashboard } from '../../api/client';
+import type { User, DashboardStats } from '../../types';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Chip, CircularProgress, Alert,
+  TableRow, Chip, CircularProgress, alpha,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const ChartTooltip = ({ active, payload }: any) => {
+  if (active && payload?.length) {
+    return (
+      <Paper sx={{ p: 1.5, background: 'rgba(18,18,48,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {payload.map((p: any, i: number) => (
+          <Typography key={i} variant="caption" sx={{ color: p.color, display: 'block' }}>{p.name}: {p.value}%</Typography>
+        ))}
+      </Paper>
+    );
+  }
+  return null;
+};
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -22,7 +34,7 @@ export default function UsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress sx={{ color: '#6C5CE7' }} /></Box>;
 
   const chartData = (stats?.manager_stats || []).map((m) => ({
     name: m.manager_name,
@@ -33,35 +45,43 @@ export default function UsersPage() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>Менеджеры</Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ color: '#fff', mb: 0.5 }}>Менеджеры</Typography>
+        <Typography variant="body2" sx={{ color: alpha('#fff', 0.4) }}>{users.length} человек</Typography>
+      </Box>
 
       {chartData.length > 0 && (
-        <Paper sx={{ p: 3, mb: 3, background: '#1a1a2e', borderRadius: 3, border: '1px solid #2a2a4a' }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Сравнение менеджеров</Typography>
-          <ResponsiveContainer width="100%" height={300}>
+        <Paper sx={{
+          p: 3, mb: 3, borderRadius: 3,
+          background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <Typography variant="h6" sx={{ color: '#fff', mb: 2, fontSize: 15, fontWeight: 600 }}>Сравнение</Typography>
+          <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="name" stroke="#999" />
-              <YAxis domain={[0, 100]} stroke="#999" />
-              <Tooltip />
-              <Bar dataKey="score" fill="#7c4dff" radius={[8, 8, 0, 0]} name="Скрипт %" />
-              <Bar dataKey="talk" fill="#00e5ff" radius={[8, 8, 0, 0]} name="Речь %" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="name" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 12 }} />
+              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 12 }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+              <Bar dataKey="score" fill="#6C5CE7" radius={[6, 6, 0, 0]} name="Скрипт" />
+              <Bar dataKey="talk" fill="#00cec9" radius={[6, 6, 0, 0]} name="Речь" />
             </BarChart>
           </ResponsiveContainer>
         </Paper>
       )}
 
-      <Paper sx={{ background: '#1a1a2e', borderRadius: 3, border: '1px solid #2a2a4a' }}>
+      <Paper sx={{
+        borderRadius: 3, overflow: 'hidden',
+        background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Имя</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Звонков</TableCell>
-                <TableCell>Скрипт</TableCell>
-                <TableCell>Время речи</TableCell>
-                <TableCell>Статус</TableCell>
+                {['Имя', 'Email', 'Звонков', 'Скрипт', 'Речь', 'Статус'].map((h) => (
+                  <TableCell key={h} sx={{ color: alpha('#fff', 0.4), borderColor: 'rgba(255,255,255,0.06)', fontSize: 12, fontWeight: 500 }}>{h}</TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -69,22 +89,33 @@ export default function UsersPage() {
                 const ms = stats?.manager_stats.find((m) => m.manager_id === u.id);
                 return (
                   <TableRow
-                    key={u.id} hover sx={{ cursor: 'pointer' }}
+                    key={u.id} hover
+                    sx={{ cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.03)' }, '& td': { borderColor: 'rgba(255,255,255,0.04)' } }}
                     onClick={() => navigate(`/users/${u.id}`)}
                   >
-                    <TableCell>
-                      <Typography fontWeight={600}>{u.username}</Typography>
-                    </TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>{ms?.processed_calls ?? 0} / {ms?.total_calls ?? 0}</TableCell>
+                    <TableCell><Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{u.username}</Typography></TableCell>
+                    <TableCell sx={{ color: alpha('#fff', 0.5), fontSize: 13 }}>{u.email}</TableCell>
+                    <TableCell sx={{ color: alpha('#fff', 0.7), fontSize: 13 }}>{ms?.processed_calls ?? 0} / {ms?.total_calls ?? 0}</TableCell>
                     <TableCell>
                       {ms?.avg_compliance != null ? (
-                        <Chip label={`${Math.round(ms.avg_compliance)}%`} size="small" color={ms.avg_compliance >= 70 ? 'success' : ms.avg_compliance >= 40 ? 'warning' : 'error'} />
-                      ) : '-'}
+                        <Chip
+                          label={`${Math.round(ms.avg_compliance)}%`}
+                          size="small"
+                          sx={{
+                            height: 22, fontSize: 11, fontWeight: 600,
+                            background: ms.avg_compliance >= 70 ? 'rgba(0,206,201,0.15)' : ms.avg_compliance >= 40 ? 'rgba(253,203,110,0.15)' : 'rgba(255,118,117,0.15)',
+                            color: ms.avg_compliance >= 70 ? '#00cec9' : ms.avg_compliance >= 40 ? '#fdcb6e' : '#ff7675',
+                          }}
+                        />
+                      ) : <Typography sx={{ color: alpha('#fff', 0.3), fontSize: 13 }}>-</Typography>}
                     </TableCell>
-                    <TableCell>{ms?.avg_talk_ratio != null ? `${Math.round(ms.avg_talk_ratio)}%` : '-'}</TableCell>
+                    <TableCell sx={{ color: alpha('#fff', 0.7), fontSize: 13 }}>{ms?.avg_talk_ratio != null ? `${Math.round(ms.avg_talk_ratio)}%` : '-'}</TableCell>
                     <TableCell>
-                      <Chip label={u.is_active ? 'Активен' : 'Неактивен'} size="small" color={u.is_active ? 'success' : 'default'} />
+                      <Chip
+                        label={u.is_active ? 'Активен' : 'Нет'}
+                        size="small"
+                        sx={{ height: 22, fontSize: 11, background: u.is_active ? 'rgba(0,206,201,0.15)' : 'rgba(255,255,255,0.08)', color: u.is_active ? '#00cec9' : alpha('#fff', 0.4) }}
+                      />
                     </TableCell>
                   </TableRow>
                 );

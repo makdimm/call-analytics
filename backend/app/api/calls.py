@@ -4,6 +4,7 @@ import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
@@ -52,7 +53,12 @@ async def upload_call(
     )
     db.add(call)
     await db.commit()
-    await db.refresh(call)
+
+    # Refresh with eager load for manager
+    result = await db.execute(
+        select(Call).options(selectinload(Call.manager)).where(Call.id == call.id)
+    )
+    call = result.scalar_one()
 
     # Запускаем обработку в фоне
     import asyncio
@@ -70,7 +76,7 @@ async def list_calls(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Call)
+    query = select(Call).options(selectinload(Call.manager))
 
     if current_user.role != UserRole.ADMIN:
         query = query.where(Call.manager_id == current_user.id)
@@ -94,7 +100,7 @@ async def list_calls(
 
 @router.get("/{call_id}", response_model=CallResponse)
 async def get_call(call_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    result = await db.execute(select(Call).where(Call.id == call_id))
+    result = await db.execute(select(Call).options(selectinload(Call.manager)).where(Call.id == call_id))
     call = result.scalar_one_or_none()
     if not call:
         raise HTTPException(status_code=404, detail="Звонок не найден")
@@ -105,7 +111,7 @@ async def get_call(call_id: int, db: AsyncSession = Depends(get_db), current_use
 
 @router.delete("/{call_id}")
 async def delete_call(call_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
-    result = await db.execute(select(Call).where(Call.id == call_id))
+    result = await db.execute(select(Call).options(selectinload(Call.manager)).where(Call.id == call_id))
     call = result.scalar_one_or_none()
     if not call:
         raise HTTPException(status_code=404, detail="Звонок не найден")

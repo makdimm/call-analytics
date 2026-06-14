@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Typography, Paper, Button, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Paper, Button, Alert, CircularProgress, alpha } from '@mui/material';
 import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import api from '../../api/client';
 
@@ -13,8 +13,8 @@ export default function GDriveSyncPage() {
     setResult(null);
     setError(null);
     try {
-      const data = await api.post('/gdrive/sync');
-      setResult(`Импортировано: ${data.imported} файлов`);
+      const resp = await api.post('/gdrive/sync');
+      setResult(`Импортировано: ${resp.data.imported} файлов`);
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Ошибка синхронизации');
     } finally {
@@ -24,40 +24,48 @@ export default function GDriveSyncPage() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 700 }}>
-        Google Drive
-      </Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" sx={{ color: '#fff', mb: 0.5 }}>Google Drive</Typography>
+        <Typography variant="body2" sx={{ color: alpha('#fff', 0.4) }}>Импорт аудиофайлов из Google Drive</Typography>
+      </Box>
 
-      <Paper sx={{ p: 4, background: '#1a1a2e', borderRadius: 3, border: '1px solid #2a2a4a', maxWidth: 600 }}>
-        <Typography variant="body1" sx={{ mb: 3 }}>
-          Импортировать новые аудиофайлы с Google Drive.
-          Файлы будут загружены и автоматически отправлены на транскрибацию и анализ.
+      <Paper sx={{
+        p: 4, borderRadius: 3, maxWidth: 600,
+        background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <Typography sx={{ color: alpha('#fff', 0.7), mb: 3, lineHeight: 1.7 }}>
+          Загрузить новые аудиофайлы из подключённой папки Google Drive.
+          Файлы будут автоматически транскрибированы и проанализированы.
         </Typography>
 
-        <Box sx={{ mb: 3, p: 2, background: '#0d0d1a', borderRadius: 2 }}>
-          <Typography variant="body2" color="grey.400">
-            Поддерживаемые форматы: MP3, WAV, OGG, M4A, FLAC
+        <Box sx={{ mb: 3, p: 2.5, borderRadius: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
+          <Typography variant="body2" sx={{ color: alpha('#fff', 0.4), fontSize: 13 }}>
+            Поддерживаются: MP3, WAV, OGG, M4A, FLAC
           </Typography>
         </Box>
 
         {syncing && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <CircularProgress size={20} />
-            <Typography>Синхронизация...</Typography>
+            <CircularProgress size={18} sx={{ color: '#6C5CE7' }} />
+            <Typography sx={{ color: alpha('#fff', 0.6), fontSize: 14 }}>Синхронизация...</Typography>
           </Box>
         )}
 
-        {result && <Alert severity="success" sx={{ mb: 2 }}>{result}</Alert>}
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {result && <Alert sx={{ mb: 2, background: 'rgba(0,206,201,0.1)', border: '1px solid rgba(0,206,201,0.2)', color: '#00cec9' }}>{result}</Alert>}
+        {error && <Alert sx={{ mb: 2, background: 'rgba(255,118,117,0.1)', border: '1px solid rgba(255,118,117,0.2)', color: '#ff7675' }}>{error}</Alert>}
 
         <Button
-          variant="contained"
-          fullWidth
-          size="large"
+          variant="contained" fullWidth size="large"
           disabled={syncing}
           onClick={handleSync}
           startIcon={<CloudSyncIcon />}
-          sx={{ py: 1.5 }}
+          sx={{
+            py: 1.5, fontWeight: 600,
+            background: 'linear-gradient(135deg, #6C5CE7, #a29bfe)',
+            '&:hover': { background: 'linear-gradient(135deg, #5a4bd1, #8c7ee6)' },
+            '&.Mui-disabled': { background: alpha('#6C5CE7', 0.3) },
+          }}
         >
           {syncing ? 'Синхронизация...' : 'Запросить новые файлы'}
         </Button>

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
@@ -131,7 +132,7 @@ async def get_dashboard(
 
     # Recent calls
     recent_q = await db.execute(
-        select(Call).where(Call.created_at >= since).order_by(desc(Call.created_at)).limit(10)
+        select(Call).options(selectinload(Call.manager)).where(Call.created_at >= since).order_by(desc(Call.created_at)).limit(10)
     )
     recent = []
     for c in recent_q.scalars().all():
@@ -220,7 +221,7 @@ async def get_manager_detail(
 
     # Recent calls
     recent_q = await db.execute(
-        select(Call).where(Call.manager_id == manager_id).order_by(desc(Call.created_at)).limit(20)
+        select(Call).options(selectinload(Call.manager)).where(Call.manager_id == manager_id).order_by(desc(Call.created_at)).limit(20)
     )
     recent = []
     for c in recent_q.scalars().all():
