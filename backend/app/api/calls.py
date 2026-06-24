@@ -9,9 +9,10 @@ from app.core.database import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.call import Call, CallStatus, ScriptCompliance
-from app.schemas.call import CallResponse, CallListResponse, CallUpdate
+from app.schemas.call import CallResponse, CallListResponse
 from app.services.whisper_service import transcribe_audio
 from app.services.gpt_service import analyze_transcript
+from app.services.websocket_service import manager as ws_manager
 from app.core.config import settings
 from datetime import datetime, timezone
 
@@ -27,7 +28,6 @@ async def upload_call(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Admin can upload for anyone; managers only for themselves
     if current_user.role != UserRole.ADMIN and current_user.id != manager_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Можно загружать только свои звонки")
 
@@ -54,15 +54,13 @@ async def upload_call(
     db.add(call)
     await db.commit()
 
-    # Refresh with eager load for manager
     result = await db.execute(
         select(Call).options(selectinload(Call.manager)).where(Call.id == call.id)
     )
     call = result.scalar_one()
 
-    # Запускаем обработку в фоне
     import asyncio
-    asyncio.create_task(process_call(call.id))
+    asyncio.ensure_future(process_call(call.id))
 
     return _call_to_response(call)
 
@@ -122,8 +120,22 @@ async def delete_call(call_id: int, db: AsyncSession = Depends(get_db), current_
     return {"ok": True}
 
 
+async def _broadcast_progress(call_id: int, status: str, progress: int, stage: str = ""):
+    """Send progress update via WebSocket."""
+    try:
+        await ws_manager.broadcast({
+            "type": "call_progress",
+            "call_id": call_id,
+            "status": status,
+            "progress": progress,
+            "stage": stage,
+        })
+    except Exception:
+        pass  # WS is best-effort
+
+
 async def process_call(call_id: int):
-    """Process a call: transcribe + analyze."""
+    """Process a call: transcribe + analyze with progress updates."""
     from app.core.database import async_session_factory
 
     async with async_session_factory() as db:
@@ -133,10 +145,16 @@ async def process_call(call_id: int):
             return
 
         try:
+            # Stage 1: Loading model
             call.status = CallStatus.PROCESSING
             await db.commit()
+            await _broadcast_progress(call_id, "processing", 0, "Загрузка модели...")
 
-            # 1. Transcribe
+            import asyncio
+            await asyncio.sleep(0.5)
+            await _broadcast_progress(call_id, "processing", 10, "Транскрибация...")
+
+            # Stage 2: Transcribe (runs in thread pool — non-blocking)
             transcription = await transcribe_audio(call.file_path)
             call.transcript = transcription["text"]
             call.duration_seconds = transcription.get("duration")
@@ -145,8 +163,12 @@ async def process_call(call_id: int):
             call.status = CallStatus.TRANSCRIBED
             await db.commit()
 
-            # 2. Analyze with GPT
+            await _broadcast_progress(call_id, "processing", 80, "Расшифровка завершена")
+
+            # Stage 3: Analyze with GPT
+            await _broadcast_progress(call_id, "processing", 85, "Анализ GPT...")
             analysis = await analyze_transcript(call.transcript)
+
             call.analysis = analysis
             call.compliance_score = analysis.get("compliance", {}).get("score")
             compliance_level = analysis.get("compliance", {}).get("level", "non_compliant")
@@ -164,9 +186,12 @@ async def process_call(call_id: int):
             call.processed_at = datetime.now(timezone.utc)
             await db.commit()
 
+            await _broadcast_progress(call_id, "analyzed", 100, "Готово")
+
         except Exception as e:
             call.status = CallStatus.FAILED
             await db.commit()
+            await _broadcast_progress(call_id, "failed", 0, "Ошибка обработки")
             raise e
 
 

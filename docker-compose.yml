@@ -22,6 +22,7 @@ services:
     build: ./backend
     env_file: ./backend/.env
     volumes:
+      - ./backend/app:/app/app
       - audio_data:/app/audio
       - upload_data:/app/uploads
     depends_on:
@@ -29,6 +30,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    mem_limit: 1.5g
+    mem_reservation: 1g
     restart: unless-stopped
 
   frontend:
