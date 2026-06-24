@@ -7,6 +7,9 @@ from app.core.config import settings
 _model = None
 _whisper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="whisper")
 
+# Thread-safe progress tracker: call_id -> progress_percent
+_progress_tracker: dict[int, int] = {}
+
 
 def get_whisper_model() -> WhisperModel:
     global _model
@@ -22,8 +25,20 @@ def get_whisper_model() -> WhisperModel:
     return _model
 
 
-async def transcribe_audio(file_path: str) -> dict:
-    """Transcribe audio using Whisper. Runs in thread pool — never blocks event loop."""
+def get_progress(call_id: int) -> int:
+    """Get current progress for a call. Thread-safe read from shared dict."""
+    return _progress_tracker.get(call_id, 0)
+
+
+def clear_progress(call_id: int):
+    _progress_tracker.pop(call_id, None)
+
+
+async def transcribe_audio(file_path: str, call_id: int | None = None) -> dict:
+    """Transcribe audio using Whisper. Runs in thread pool — never blocks event loop.
+
+    If call_id is provided, progress is tracked in _progress_tracker for real-time polling.
+    """
     model = get_whisper_model()
     loop = asyncio.get_running_loop()
 
@@ -44,10 +59,22 @@ async def transcribe_audio(file_path: str) -> dict:
             word_timestamps=False,
         )
 
-        segments = list(segments_gen)
-        return segments, info
+        total_duration = info.duration or 1
+        segments_list = []
+
+        # Iterate segments manually for progress tracking
+        for seg in segments_gen:
+            segments_list.append(seg)
+            if call_id is not None and total_duration > 0:
+                progress = min(95, int((seg.end / total_duration) * 100))
+                _progress_tracker[call_id] = max(progress, _progress_tracker.get(call_id, 0))
+
+        return segments_list, info
 
     segments_list, info = await loop.run_in_executor(_whisper_executor, _run)
+
+    if call_id is not None:
+        clear_progress(call_id)
 
     full_text = " ".join(seg.text.strip() for seg in segments_list if seg.text)
 

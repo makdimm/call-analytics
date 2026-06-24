@@ -1,5 +1,6 @@
 import os
 import uuid
+import asyncio
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +11,7 @@ from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.call import Call, CallStatus, ScriptCompliance
 from app.schemas.call import CallResponse, CallListResponse
-from app.services.whisper_service import transcribe_audio
+from app.services.whisper_service import transcribe_audio, get_progress as whisper_get_progress
 from app.services.gpt_service import analyze_transcript
 from app.services.websocket_service import manager as ws_manager
 from app.core.config import settings
@@ -59,7 +60,6 @@ async def upload_call(
     )
     call = result.scalar_one()
 
-    import asyncio
     asyncio.ensure_future(process_call(call.id))
 
     return _call_to_response(call)
@@ -166,7 +166,23 @@ async def process_call(call_id: int):
             await _broadcast_progress(call_id, "processing", 5, "Транскрибация large-v3 (~5 мин на минуту аудио)...")
 
             # Stage 2: Transcribe (runs in thread pool — non-blocking)
-            transcription = await transcribe_audio(call.file_path)
+            # Start a background poller for real-time progress from whisper
+            async def _poll_progress():
+                while True:
+                    progress = whisper_get_progress(call_id)
+                    if progress > 0:
+                        await _broadcast_progress(
+                            call_id, "processing",
+                            max(5, progress),
+                            f"Транскрибация large-v3... ({progress}%)"
+                        )
+                    if progress >= 95:
+                        break
+                    await asyncio.sleep(3)
+
+            poll_task = asyncio.ensure_future(_poll_progress())
+            transcription = await transcribe_audio(call.file_path, call_id=call_id)
+            poll_task.cancel()
             call.transcript = transcription["text"]
             call.duration_seconds = transcription.get("duration")
             call.transcript_confidence = transcription.get("confidence")
