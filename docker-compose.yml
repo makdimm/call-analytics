@@ -21,6 +21,7 @@ services:
   backend:
     build: ./backend
     env_file: ./backend/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./backend/app:/app/app
       - audio_data:/app/audio
