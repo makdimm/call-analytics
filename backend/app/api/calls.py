@@ -169,17 +169,26 @@ async def process_call(call_id: int):
             # Start a background poller for real-time progress from whisper
             async def _poll_progress():
                 last_progress = -1
+                from app.core.database import async_session_factory as _session_factory
                 while True:
                     progress = whisper_get_progress(call_id)
-                    # Always broadcast on first poll (catches late WS clients)
-                    # Then broadcast on every change
                     if progress != last_progress:
                         display_pct = max(5, progress)
+                        # Broadcast via WS
                         await _broadcast_progress(
                             call_id, "processing",
                             display_pct,
-                            f"Транскрибация large-v3... ({display_pct}%)" if progress > 0 else "Загрузка модели large-v3 (3.1 GB), ждите..."
+                            f"Транскрибация large-v3... ({display_pct}%)" if progress > 0 else "Загрузка модели large-v3 (~3.1 GB)..."
                         )
+                        # Persist to DB every change
+                        try:
+                            async with _session_factory() as pdb:
+                                pcall = await pdb.get(Call, call_id)
+                                if pcall:
+                                    pcall.progress = display_pct
+                                    await pdb.commit()
+                        except Exception:
+                            pass
                         last_progress = progress
                     if progress >= 95:
                         break
@@ -245,6 +254,7 @@ def _call_to_response(call: Call) -> CallResponse:
         emotions=call.emotions,
         keywords_found=call.keywords_found,
         objections_handled=call.objections_handled,
+        progress=call.progress,
         source=call.source,
         created_at=call.created_at,
         processed_at=call.processed_at,

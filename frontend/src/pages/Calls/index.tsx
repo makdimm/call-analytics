@@ -105,7 +105,7 @@ export default function CallsPage() {
                             <Box sx={{ flex: 1 }}>
                               <LinearProgress
                                 variant="determinate"
-                                value={prog?.progress ?? 0}
+                                value={prog?.progress ?? call.progress}
                                 sx={{
                                   height: 4, borderRadius: 2,
                                   bgcolor: '#e5e7eb',
@@ -114,7 +114,7 @@ export default function CallsPage() {
                               />
                             </Box>
                             <Typography sx={{ fontSize: 11, color: '#6b7280', minWidth: 28, textAlign: 'right' }}>
-                              {prog?.progress ?? 0}%
+                              {prog?.progress ?? call.progress}%
                             </Typography>
                           </Box>
                         ) : call.status === 'analyzed' ? (
