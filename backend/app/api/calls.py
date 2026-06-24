@@ -74,23 +74,33 @@ async def list_calls(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Call).options(selectinload(Call.manager))
+    # Build count query without selectinload to avoid cartesian product
+    count_query = select(func.count(Call.id))
 
     if current_user.role != UserRole.ADMIN:
-        query = query.where(Call.manager_id == current_user.id)
+        count_query = count_query.where(Call.manager_id == current_user.id)
     elif manager_id:
-        query = query.where(Call.manager_id == manager_id)
+        count_query = count_query.where(Call.manager_id == manager_id)
 
     if status_filter:
-        query = query.where(Call.status == CallStatus(status_filter))
+        count_query = count_query.where(Call.status == CallStatus(status_filter))
 
-    query = query.order_by(desc(Call.created_at))
+    total = (await db.execute(count_query)).scalar()
 
-    total_q = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(total_q)).scalar()
+    # Now fetch the actual data with selectinload
+    data_query = select(Call).options(selectinload(Call.manager))
 
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(query)
+    if current_user.role != UserRole.ADMIN:
+        data_query = data_query.where(Call.manager_id == current_user.id)
+    elif manager_id:
+        data_query = data_query.where(Call.manager_id == manager_id)
+
+    if status_filter:
+        data_query = data_query.where(Call.status == CallStatus(status_filter))
+
+    data_query = data_query.order_by(desc(Call.created_at))
+    data_query = data_query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(data_query)
     calls = result.scalars().all()
 
     return CallListResponse(items=[_call_to_response(c) for c in calls], total=total, page=page, page_size=page_size)
