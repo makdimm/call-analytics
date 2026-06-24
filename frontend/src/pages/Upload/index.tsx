@@ -3,7 +3,7 @@ import { getUsers, uploadCall } from '../../api/client';
 import type { User } from '../../types';
 import {
   Box, Typography, Paper, Button, Select, MenuItem, FormControl, InputLabel,
-  Alert, LinearProgress,
+  Alert, LinearProgress, Link,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
@@ -76,10 +76,42 @@ export default function UploadPage() {
           </Typography>
         </Box>
 
+        {/* Processing time warning */}
+        {file && !uploading && !result && (
+          <Box sx={{ mb: 2.5, p: 2, borderRadius: 1.5, bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400e', mb: 0.5 }}>
+              ⏳ Обратите внимание
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+              Транскрибация Whisper large-v3 на сервере занимает{' '}
+              <strong>~5 минут на 1 минуту записи</strong>.
+              Статус обработки и прогресс можно отслеживать в{' '}
+              <Link href="/calls" sx={{ color: '#b45309', fontWeight: 500 }}>Звонках</Link>.
+              Страницу можно закрыть — обработка продолжится в фоне.
+            </Typography>
+          </Box>
+        )}
+
         {uploading && <LinearProgress sx={{ mb: 2 }} />}
 
-        {result && (
-          <Alert severity={result.ok ? 'success' : 'error'} sx={{ mb: 2, fontSize: 13 }}>
+        {result?.ok && (
+          <Alert severity="success" sx={{ mb: 2, fontSize: 13 }}>
+            {result.msg}
+            <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400e', mb: 0.5 }}>
+                ⏳ Время обработки
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                Whisper large-v3 + анализ GPT займут <strong>~5–10 минут на минуту</strong> записи.
+                Следите за прогрессом на странице{' '}
+                <Link href="/calls" sx={{ color: '#b45309', fontWeight: 500 }}>Звонки</Link>.
+              </Typography>
+            </Box>
+          </Alert>
+        )}
+
+        {result && !result.ok && (
+          <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
             {result.msg}
           </Alert>
         )}

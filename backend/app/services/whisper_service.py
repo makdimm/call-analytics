@@ -11,11 +11,12 @@ _whisper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="whispe
 def get_whisper_model() -> WhisperModel:
     global _model
     if _model is None:
+        model_size = settings.WHISPER_MODEL_SIZE
         _model = WhisperModel(
-            settings.WHISPER_MODEL_SIZE,
+            model_size,
             device="cpu",
             compute_type="int8",
-            cpu_threads=4,
+            cpu_threads=2,
             num_workers=1,
         )
     return _model
@@ -43,7 +44,6 @@ async def transcribe_audio(file_path: str) -> dict:
             word_timestamps=False,
         )
 
-        # Consume generator inside the thread
         segments = list(segments_gen)
         return segments, info
 

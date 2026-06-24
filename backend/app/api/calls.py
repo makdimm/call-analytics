@@ -148,11 +148,12 @@ async def process_call(call_id: int):
             # Stage 1: Loading model
             call.status = CallStatus.PROCESSING
             await db.commit()
-            await _broadcast_progress(call_id, "processing", 0, "Загрузка модели...")
+            await _broadcast_progress(call_id, "processing", 0, "Загрузка модели large-v3 (~1.6 GB)...")
 
             import asyncio
             await asyncio.sleep(0.5)
-            await _broadcast_progress(call_id, "processing", 10, "Транскрибация...")
+            await _broadcast_progress(call_id, "processing", 2, "Модель загружена, начинаем транскрибацию...")
+            await _broadcast_progress(call_id, "processing", 5, "Транскрибация large-v3 (~5 мин на минуту аудио)...")
 
             # Stage 2: Transcribe (runs in thread pool — non-blocking)
             transcription = await transcribe_audio(call.file_path)
@@ -163,10 +164,11 @@ async def process_call(call_id: int):
             call.status = CallStatus.TRANSCRIBED
             await db.commit()
 
-            await _broadcast_progress(call_id, "processing", 80, "Расшифровка завершена")
+            duration_min = transcription.get("duration", 0) / 60
+            await _broadcast_progress(call_id, "processing", 85, f"Расшифровка завершена ({duration_min:.1f} мин записи)")
 
             # Stage 3: Analyze with GPT
-            await _broadcast_progress(call_id, "processing", 85, "Анализ GPT...")
+            await _broadcast_progress(call_id, "processing", 90, "Анализ GPT-4o-mini...")
             analysis = await analyze_transcript(call.transcript)
 
             call.analysis = analysis
