@@ -227,12 +227,12 @@ export default function DashboardPage() {
                               <Box sx={{ flex: 1 }}>
                                 <LinearProgress
                                   variant="determinate"
-                                  value={prog?.progress ?? 10}
+                                  value={prog?.progress ?? 0}
                                   sx={{ height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: '#3b82f6', borderRadius: 2 } }}
                                 />
                               </Box>
                               <Typography sx={{ fontSize: 11, color: '#6b7280' }}>
-                                {prog?.progress ?? 10}%
+                                {prog?.progress ?? 0}%
                               </Typography>
                             </Box>
                           ) : call.status === 'analyzed' || call.status === 'failed' ? (

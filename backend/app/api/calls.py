@@ -168,14 +168,19 @@ async def process_call(call_id: int):
             # Stage 2: Transcribe (runs in thread pool — non-blocking)
             # Start a background poller for real-time progress from whisper
             async def _poll_progress():
+                last_progress = -1
                 while True:
                     progress = whisper_get_progress(call_id)
-                    if progress > 0:
+                    # Always broadcast on first poll (catches late WS clients)
+                    # Then broadcast on every change
+                    if progress != last_progress:
+                        display_pct = max(5, progress)
                         await _broadcast_progress(
                             call_id, "processing",
-                            max(5, progress),
-                            f"Транскрибация large-v3... ({progress}%)"
+                            display_pct,
+                            f"Транскрибация large-v3... ({display_pct}%)" if progress > 0 else "Загрузка модели large-v3 (3.1 GB), ждите..."
                         )
+                        last_progress = progress
                     if progress >= 95:
                         break
                     await asyncio.sleep(3)

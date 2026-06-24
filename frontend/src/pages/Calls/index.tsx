@@ -105,7 +105,7 @@ export default function CallsPage() {
                             <Box sx={{ flex: 1 }}>
                               <LinearProgress
                                 variant="determinate"
-                                value={prog?.progress ?? 10}
+                                value={prog?.progress ?? 0}
                                 sx={{
                                   height: 4, borderRadius: 2,
                                   bgcolor: '#e5e7eb',
@@ -114,7 +114,7 @@ export default function CallsPage() {
                               />
                             </Box>
                             <Typography sx={{ fontSize: 11, color: '#6b7280', minWidth: 28, textAlign: 'right' }}>
-                              {prog?.progress ?? 10}%
+                              {prog?.progress ?? 0}%
                             </Typography>
                           </Box>
                         ) : call.status === 'analyzed' ? (
@@ -236,12 +236,12 @@ export default function CallsPage() {
                     <Box sx={{ flex: 1 }}>
                       <LinearProgress
                         variant="determinate"
-                        value={callProgress.get(selectedCall.id)?.progress ?? 10}
+                        value={callProgress.get(selectedCall.id)?.progress ?? 0}
                         sx={{ height: 6, borderRadius: 3, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: '#3b82f6', borderRadius: 3 } }}
                       />
                     </Box>
                     <Typography sx={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
-                      {callProgress.get(selectedCall.id)?.progress ?? 10}%
+                      {callProgress.get(selectedCall.id)?.progress ?? 0}%
                     </Typography>
                   </Box>
                 </Box>
