@@ -118,8 +118,20 @@ export default function CallDetailPage() {
               <Avatar sx={{ bgcolor: '#3b82f6', borderRadius: 1.5, width: 48, height: 48 }}>
                 <PhoneIcon />
               </Avatar>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 600 }}>{call.original_filename}</Typography>
+              <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
+                <Typography variant="h5" sx={{
+                  fontWeight: 600,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  '@media (max-width: 600px)': {
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-all',
+                    fontSize: 16,
+                  },
+                }}>
+                  {call.original_filename}
+                </Typography>
                 <Typography sx={{ color: '#6b7280', fontSize: 14 }}>
                   Менеджер: {call.manager_name || `ID ${call.manager_id}`}
                   {call.duration_seconds ? ` · ${Math.round(call.duration_seconds)}с` : ''}

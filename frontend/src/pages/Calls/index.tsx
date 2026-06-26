@@ -167,7 +167,13 @@ export default function CallsPage() {
                       sx={{ cursor: 'pointer' }}
                       onClick={() => navigate(`/calls/${call.id}`)}
                     >
-                      <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>
+                      <TableCell sx={{
+                        fontWeight: 500, color: '#1f2937',
+                        maxWidth: { xs: 180, sm: 300 },
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
                         {call.original_filename}
                       </TableCell>
                       <TableCell sx={{ color: '#4b5563' }}>
