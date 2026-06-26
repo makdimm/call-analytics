@@ -27,3 +27,8 @@ body {
   background: #d1d5db;
   border-radius: 3px;
 }
+
+/* Dialog title padding fix */
+.MuiDialogTitle-root + .css-14kpzj8 {
+  padding-top: 0px;
+}

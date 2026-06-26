@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # Whisper
+    WHISPER_PROVIDER: str = "api"  # "api" or "local"
     WHISPER_MODEL_SIZE: str = "large-v3"
+    WHISPER_API_BASE_URL: str = "https://api.openai.com/v1"
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:80"
