@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCall } from '../../api/client';
+import { api } from '../../api/client';
 import type { Call } from '../../types';
 import {
   Box, Typography, Paper, Grid, Chip, CircularProgress, Button, Avatar,
-  LinearProgress, Tooltip, Divider,
+  LinearProgress, Tooltip, Divider, Switch, IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import PersonIcon from '@mui/icons-material/Person';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 
 const STATUS_LABEL: Record<string, string> = {
-  analyzed: 'Проанализирован',
-  failed: 'Ошибка',
-  processing: 'Обработка...',
-  transcribed: 'Расшифрован',
-  uploaded: 'Загружен',
+  analyzed: 'Проанализирован', failed: 'Ошибка', processing: 'Обработка...',
+  transcribed: 'Расшифрован', uploaded: 'Загружен',
 };
 const STATUS_COLOR: Record<string, string> = {
   analyzed: '#10b981', failed: '#ef4444', processing: '#3b82f6',
@@ -24,7 +26,6 @@ const STATUS_BG: Record<string, string> = {
   analyzed: '#ecfdf5', failed: '#fef2f2', processing: '#eff6ff',
   transcribed: '#fffbeb', uploaded: '#f3f4f6',
 };
-
 const CALL_TYPE_LABELS: Record<string, string> = {
   new_lead: 'Новая заявка', acceleration: 'Ускорение',
   clarification: 'Уточнение', auto_answer: 'Автоответ',
@@ -60,10 +61,7 @@ const CRITERIA_CONFIG: Record<string, { label: string; desc: string }> = {
 };
 
 function scoreColor(s: number | null | undefined): string {
-  if (s == null) return '#9ca3af';
-  if (s >= 70) return '#10b981';
-  if (s >= 40) return '#f59e0b';
-  return '#ef4444';
+  if (s == null) return '#9ca3af'; if (s >= 70) return '#10b981'; if (s >= 40) return '#f59e0b'; return '#ef4444';
 }
 
 function CriteriaScoreBar({ score, label, desc }: { score: number; label: string; desc: string }) {
@@ -78,12 +76,16 @@ function CriteriaScoreBar({ score, label, desc }: { score: number; label: string
         </Tooltip>
         <Typography sx={{ fontSize: 13, fontWeight: 700, color }}>{grade}</Typography>
       </Box>
-      <LinearProgress
-        variant="determinate" value={pct}
-        sx={{ height: 8, borderRadius: 4, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 } }}
-      />
+      <LinearProgress variant="determinate" value={pct}
+        sx={{ height: 8, borderRadius: 4, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 } }} />
     </Box>
   );
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 export default function CallDetailPage() {
@@ -91,56 +93,71 @@ export default function CallDetailPage() {
   const [call, setCall] = useState<Call | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const loadCall = () => {
     if (id) getCall(Number(id)).then(setCall).catch(() => setError('Звонок не найден')).finally(() => setLoading(false));
-  }, [id]);
+  };
+  useEffect(loadCall, [id]);
+
+  const toggleExclude = async () => {
+    if (!call) return;
+    await api.patch(`/calls/${call.id}/exclude-rating?exclude=${!call.exclude_from_rating}`);
+    loadCall();
+  };
+
+  const toggleAudio = () => {
+    if (!call) return;
+    if (audioPlaying && audioEl) {
+      audioEl.pause();
+      setAudioPlaying(false);
+      return;
+    }
+    const aud = new Audio(`/api/calls/${call.id}/audio`);
+    aud.onended = () => setAudioPlaying(false);
+    aud.play();
+    setAudioEl(aud);
+    setAudioPlaying(true);
+  };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
   if (error || !call) return <Typography color="error" sx={{ p: 4 }}>{error || 'Ошибка'}</Typography>;
 
   const cs = call.criteria_scores || {};
   const a = call.analysis || {};
+  const cd = call.client_data;
+  const conv = call.conversation || [];
 
   return (
     <Box>
-      {/* Header */}
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/calls')}
         sx={{ color: '#6b7280', mb: 2, textTransform: 'none', '&:hover': { color: '#1f2937' } }}>
         К списку звонков
       </Button>
 
+      {/* Header */}
       <Paper sx={{ p: 3, mb: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-        <Grid container spacing={3} sx={{ alignItems: "center" }}>
+        <Grid container spacing={3} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 6 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar sx={{ bgcolor: '#3b82f6', borderRadius: 1.5, width: 48, height: 48 }}>
-                <PhoneIcon />
-              </Avatar>
+              <Avatar sx={{ bgcolor: '#3b82f6', borderRadius: 1.5, width: 48, height: 48 }}><PhoneIcon /></Avatar>
               <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
                 <Typography variant="h5" sx={{
-                  fontWeight: 600,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  '@media (max-width: 600px)': {
-                    whiteSpace: 'normal',
-                    wordBreak: 'break-all',
-                    fontSize: 16,
-                  },
+                  fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  '@media (max-width: 600px)': { whiteSpace: 'normal', wordBreak: 'break-all', fontSize: 16 },
                 }}>
                   {call.original_filename}
                 </Typography>
                 <Typography sx={{ color: '#6b7280', fontSize: 14 }}>
-                  Менеджер: {call.manager_name || `ID ${call.manager_id}`}
-                  {call.duration_seconds ? ` · ${Math.round(call.duration_seconds)}с` : ''}
+                  {call.manager_name || `ID ${call.manager_id}`}{call.duration_seconds ? ` · ${Math.round(call.duration_seconds)}с` : ''}
                 </Typography>
               </Box>
             </Box>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: { md: 'flex-end' }, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: { md: 'flex-end' }, flexWrap: 'wrap', alignItems: 'center' }}>
               <Chip label={STATUS_LABEL[call.status] || call.status} size="small"
                 sx={{ height: 26, fontSize: 12, fontWeight: 600, bgcolor: STATUS_BG[call.status] || '#f3f4f6', color: STATUS_COLOR[call.status] || '#6b7280' }} />
               {call.call_type && <Chip label={CALL_TYPE_LABELS[call.call_type] || call.call_type} size="small"
@@ -150,14 +167,38 @@ export default function CallDetailPage() {
                   sx={{ height: 26, fontSize: 12, fontWeight: 600, bgcolor: WARMTH_LABELS[call.warmth].bg, color: WARMTH_LABELS[call.warmth].color }} />}
               {call.script_compliance &&
                 <Chip label={COMPLIANCE_LABEL[call.script_compliance] || call.script_compliance} size="small"
-                  sx={{
-                    height: 26, fontSize: 12, fontWeight: 600,
-                    bgcolor: call.script_compliance === 'compliant' ? '#ecfdf5' : call.script_compliance === 'partial' ? '#fffbeb' : '#fef2f2',
-                    color: call.script_compliance === 'compliant' ? '#10b981' : call.script_compliance === 'partial' ? '#f59e0b' : '#ef4444',
-                  }} />}
+                  sx={{ height: 26, fontSize: 12, fontWeight: 600, bgcolor: call.script_compliance === 'compliant' ? '#ecfdf5' : call.script_compliance === 'partial' ? '#fffbeb' : '#fef2f2',
+                    color: call.script_compliance === 'compliant' ? '#10b981' : call.script_compliance === 'partial' ? '#f59e0b' : '#ef4444' }} />}
             </Box>
           </Grid>
         </Grid>
+      </Paper>
+
+      {/* Audio player + Exclude from rating */}
+      <Paper sx={{ p: 2, mb: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <IconButton onClick={toggleAudio} sx={{
+            bgcolor: '#3b82f6', color: '#fff', '&:hover': { bgcolor: '#2563eb' },
+            width: 44, height: 44,
+          }}>
+            {audioPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+          </IconButton>
+          <Box sx={{ flex: 1, minWidth: 120 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>
+              {audioPlaying ? 'Воспроизведение...' : 'Прослушать запись'}
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#6b7280' }}>
+              {call.original_filename} · {call.duration_seconds ? `${Math.round(call.duration_seconds)}с` : ''}
+            </Typography>
+          </Box>
+          <Divider orientation="vertical" flexItem />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography sx={{ fontSize: 13, color: '#6b7280' }}>
+              Исключить из рейтинга
+            </Typography>
+            <Switch checked={call.exclude_from_rating} onChange={toggleExclude} size="small" />
+          </Box>
+        </Box>
       </Paper>
 
       {/* Scores row */}
@@ -202,62 +243,87 @@ export default function CallDetailPage() {
         </Grid>
       </Grid>
 
-      {/* Main content: 2 columns */}
+      {/* Main grid: Criteria + Client Data */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         {/* Left: Criteria */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-            <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#1f2937', mb: 2.5 }}>
-              Оценка по критериям
-            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#1f2937', mb: 2.5 }}>Оценка по критериям</Typography>
             {Object.keys(cs).length > 0 ? (
               Object.entries(CRITERIA_CONFIG).map(([key, cfg]) => {
-                const val = cs[key];
-                if (val === undefined) return null;
+                const val = cs[key]; if (val === undefined) return null;
                 return <CriteriaScoreBar key={key} score={val} label={cfg.label} desc={cfg.desc} />;
               })
-            ) : (
-              <Typography sx={{ color: '#9ca3af' }}>Нет данных</Typography>
-            )}
+            ) : <Typography sx={{ color: '#9ca3af' }}>Нет данных</Typography>}
           </Paper>
         </Grid>
 
-        {/* Right: Summary + Details */}
+        {/* Right: Client Data + Details */}
         <Grid size={{ xs: 12, md: 6 }}>
+          {/* Client data card */}
+          {cd && (cd.request || cd.income_source || cd.city) && (
+            <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2, mb: 2.5 }}>
+              <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#1f2937', mb: 2 }}>
+                👤 Данные клиента
+              </Typography>
+              <Grid container spacing={1.5}>
+                {cd.request && <Grid size={12}>
+                  <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#0369a1', mb: 0.25 }}>ЗАПРОС КЛИЕНТА</Typography>
+                    <Typography sx={{ fontSize: 13, color: '#1f2937' }}>{cd.request}</Typography>
+                  </Box>
+                </Grid>}
+                {cd.income_source && <Grid size={{ xs: 6 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Источник дохода</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#1f2937' }}>{cd.income_source}</Typography>
+                </Grid>}
+                {cd.age && <Grid size={{ xs: 6 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Возраст</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#1f2937' }}>{cd.age}</Typography>
+                </Grid>}
+                {cd.city && <Grid size={{ xs: 6 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Город</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#1f2937' }}>{cd.city}</Typography>
+                </Grid>}
+                {cd.purchase_readiness && <Grid size={{ xs: 6 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Готовность купить</Typography>
+                  <Chip label={cd.purchase_readiness} size="small"
+                    sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: cd.purchase_readiness === 'высокая' ? '#ecfdf5' : cd.purchase_readiness === 'средняя' ? '#fffbeb' : '#fef2f2',
+                      color: cd.purchase_readiness === 'высокая' ? '#10b981' : cd.purchase_readiness === 'средняя' ? '#f59e0b' : '#ef4444' }} />
+                </Grid>}
+                {cd.result_timeline && <Grid size={{ xs: 12 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Когда хочет результат</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#1f2937' }}>{cd.result_timeline}</Typography>
+                </Grid>}
+                {cd.main_objections && cd.main_objections.length > 0 && <Grid size={12}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Главные возражения</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {cd.main_objections.map((o: string, i: number) => (
+                      <Chip key={i} label={o} size="small" sx={{ bgcolor: '#fef2f2', color: '#ef4444', fontSize: 11, fontWeight: 500 }} />
+                    ))}
+                  </Box>
+                </Grid>}
+              </Grid>
+            </Paper>
+          )}
+
+          {/* Details */}
           <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2, mb: 2.5 }}>
-            <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#1f2937', mb: 2 }}>
-              Детали
-            </Typography>
+            <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#1f2937', mb: 2 }}>Детали</Typography>
             <Grid container spacing={2}>
               {call.manager_tone && (
-                <Grid size={{ xs: 6 }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Тон менеджера</Typography>
-                  <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[call.manager_tone] || call.manager_tone}</Typography>
-                </Grid>
+                <Grid size={{ xs: 6 }}><Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Тон менеджера</Typography>
+                  <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[call.manager_tone] || call.manager_tone}</Typography></Grid>
               )}
               {call.client_tone && (
-                <Grid size={{ xs: 6 }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Тон клиента</Typography>
-                  <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[call.client_tone] || call.client_tone}</Typography>
-                </Grid>
+                <Grid size={{ xs: 6 }}><Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Тон клиента</Typography>
+                  <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[call.client_tone] || call.client_tone}</Typography></Grid>
               )}
               {call.manager_tone && call.client_tone && <Grid size={{ xs: 12 }}><Divider /></Grid>}
-              <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Дата звонка</Typography>
-                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{new Date(call.created_at).toLocaleString('ru')}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Обработан</Typography>
-                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{call.processed_at ? new Date(call.processed_at).toLocaleString('ru') : '-'}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Источник</Typography>
-                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{call.source === 'upload' ? 'Загрузка' : call.source === 'google_drive' ? 'Google Drive' : call.source || '—'}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Длительность</Typography>
-                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{call.duration_seconds ? `${Math.round(call.duration_seconds)}с` : '-'}</Typography>
-              </Grid>
+              <Grid size={{ xs: 6 }}><Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Дата звонка</Typography>
+                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{new Date(call.created_at).toLocaleString('ru')}</Typography></Grid>
+              <Grid size={{ xs: 6 }}><Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', mb: 0.25 }}>Обработан</Typography>
+                <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{call.processed_at ? new Date(call.processed_at).toLocaleString('ru') : '-'}</Typography></Grid>
             </Grid>
           </Paper>
 
@@ -267,25 +333,17 @@ export default function CallDetailPage() {
               <Grid container spacing={2}>
                 {call.strengths && call.strengths.length > 0 && (
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#166534', mb: 1.5 }}>
-                      ✅ Сильные стороны
-                    </Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#166534', mb: 1.5 }}>✅ Сильные стороны</Typography>
                     <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {call.strengths.map((s, i) => (
-                        <li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>
-                      ))}
+                      {call.strengths.map((s, i) => (<li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>))}
                     </ul>
                   </Grid>
                 )}
                 {call.growth_areas && call.growth_areas.length > 0 && (
                   <Grid size={{ xs: 12, md: 6 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#92400e', mb: 1.5 }}>
-                      📈 Что улучшить
-                    </Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#92400e', mb: 1.5 }}>📈 Что улучшить</Typography>
                     <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {call.growth_areas.map((s, i) => (
-                        <li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>
-                      ))}
+                      {call.growth_areas.map((s, i) => (<li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>))}
                     </ul>
                   </Grid>
                 )}
@@ -312,9 +370,7 @@ export default function CallDetailPage() {
             <Box sx={{ mt: 1.5 }}>
               <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', mb: 0.5 }}>Рекомендации:</Typography>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
-                {a.recommendations.map((r: string, i: number) => (
-                  <li key={i}><Typography sx={{ fontSize: 13, color: '#6b7280' }}>{r}</Typography></li>
-                ))}
+                {a.recommendations.map((r: string, i: number) => (<li key={i}><Typography sx={{ fontSize: 13, color: '#6b7280' }}>{r}</Typography></li>))}
               </ul>
             </Box>
           )}
@@ -333,19 +389,58 @@ export default function CallDetailPage() {
         </Paper>
       )}
 
-      {/* Full transcript */}
-      {call.transcript && (
-        <Paper sx={{ borderRadius: 2, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      {/* Chat-style transcript */}
+      {conv.length > 0 && (
+        <Paper sx={{ borderRadius: 2, border: '1px solid #e5e7eb', overflow: 'hidden', mb: 3 }}>
           <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
             <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
-              📝 Полная транскрипция
+              💬 Разговор
             </Typography>
           </Box>
+          <Box sx={{ p: 2.5, maxHeight: 500, overflow: 'auto', bgcolor: '#fafafa' }}>
+            {conv.map((msg, i) => {
+              const isManager = msg.speaker === 'manager';
+              return (
+                <Box key={i} sx={{
+                  display: 'flex', gap: 1.5, mb: 2,
+                  flexDirection: isManager ? 'row' : 'row-reverse',
+                }}>
+                  <Avatar sx={{
+                    width: 32, height: 32, fontSize: 13, fontWeight: 600,
+                    bgcolor: isManager ? '#3b82f6' : '#10b981',
+                    borderRadius: 1.5, flexShrink: 0,
+                  }}>
+                    {isManager ? <SupportAgentIcon sx={{ fontSize: 18 }} /> : <PersonIcon sx={{ fontSize: 18 }} />}
+                  </Avatar>
+                  <Box sx={{
+                    maxWidth: '80%',
+                    p: 1.5,
+                    borderRadius: 2,
+                    bgcolor: isManager ? '#eff6ff' : '#f0fdf4',
+                    border: `1px solid ${isManager ? '#bfdbfe' : '#bbf7d0'}`,
+                  }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: isManager ? '#1d4ed8' : '#15803d', mb: 0.25 }}>
+                      {isManager ? 'Менеджер' : 'Клиент'} · {formatTime(msg.timestamp)}
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
+                      {msg.text}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Paper>
+      )}
+
+      {/* Raw transcript fallback */}
+      {call.transcript && conv.length === 0 && (
+        <Paper sx={{ borderRadius: 2, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>📝 Транскрипция</Typography>
+          </Box>
           <Box sx={{ p: 3, maxHeight: 500, overflow: 'auto', bgcolor: '#fafafa' }}>
-            <Typography sx={{
-              fontSize: 13, color: '#374151', whiteSpace: 'pre-wrap', lineHeight: 1.8,
-              fontFamily: '"JetBrains Mono", "Inter", monospace',
-            }}>
+            <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'pre-wrap', lineHeight: 1.8, fontFamily: '"JetBrains Mono", "Inter", monospace' }}>
               {call.transcript}
             </Typography>
           </Box>

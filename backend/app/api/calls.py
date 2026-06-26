@@ -117,6 +117,37 @@ async def get_call(call_id: int, db: AsyncSession = Depends(get_db), current_use
     return _call_to_response(call)
 
 
+@router.get("/{call_id}/audio")
+async def get_call_audio(
+    call_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve the audio file for a call."""
+    call = await db.get(Call, call_id)
+    if not call or not call.file_path:
+        raise HTTPException(status_code=404, detail="Аудиофайл не найден")
+    if not os.path.exists(call.file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден на диске")
+    from fastapi.responses import FileResponse
+    return FileResponse(call.file_path, media_type="audio/mpeg", filename=call.original_filename)
+
+
+@router.patch("/{call_id}/exclude-rating")
+async def toggle_exclude_rating(
+    call_id: int,
+    exclude: bool,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    call = await db.get(Call, call_id)
+    if not call:
+        raise HTTPException(status_code=404, detail="Звонок не найден")
+    call.exclude_from_rating = exclude
+    await db.commit()
+    return {"exclude_from_rating": exclude}
+
+
 @router.delete("/{call_id}")
 async def delete_call(call_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     result = await db.execute(select(Call).options(selectinload(Call.manager)).where(Call.id == call_id))
@@ -283,4 +314,7 @@ def _call_to_response(call: Call) -> CallResponse:
         client_tone=analysis.get("client_tone"),
         strengths=analysis.get("strengths"),
         growth_areas=analysis.get("growth_areas"),
+        exclude_from_rating=call.exclude_from_rating if hasattr(call, 'exclude_from_rating') else False,
+        client_data=analysis.get("client_data"),
+        conversation=analysis.get("conversation"),
     )

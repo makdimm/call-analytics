@@ -109,8 +109,8 @@ async def get_dashboard(
 ):
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Base filter
-    base = select(Call).where(Call.created_at >= since)
+    # Base filter (exclude calls that are excluded from rating)
+    base = select(Call).where(Call.created_at >= since, Call.exclude_from_rating == False)
     if current_user.role != UserRole.ADMIN:
         base = base.where(Call.manager_id == current_user.id)
 
@@ -129,10 +129,11 @@ async def get_dashboard(
         select(func.count()).select_from(base.where(Call.status == CallStatus.FAILED).subquery())
     )).scalar() or 0
 
-    # Avg compliance
+    # Avg compliance (exclude rating-excluded calls)
     analyzed_base = base.where(
         Call.status == CallStatus.ANALYZED,
         Call.compliance_score.isnot(None),
+        Call.exclude_from_rating == False,
     )
     avg_compliance = (await db.execute(
         select(func.avg(Call.compliance_score)).select_from(analyzed_base.subquery())
@@ -219,7 +220,7 @@ async def get_dashboard(
                 mgr_objects_count += m.get("objection_count", 0)
                 mgr_objects_total += 1
 
-            mgr_base = select(Call).where(Call.manager_id == mgr.id, Call.created_at >= since)
+            mgr_base = select(Call).where(Call.manager_id == mgr.id, Call.created_at >= since, Call.exclude_from_rating == False)
             mgr_total = (await db.execute(select(func.count()).select_from(mgr_base.subquery()))).scalar() or 0
             mgr_avg_comp = (await db.execute(
                 select(func.avg(Call.compliance_score)).select_from(
@@ -325,7 +326,7 @@ async def get_manager_detail(
         raise HTTPException(status_code=404, detail="Менеджер не найден")
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    base = select(Call).where(Call.manager_id == manager_id, Call.created_at >= since)
+    base = select(Call).where(Call.manager_id == manager_id, Call.created_at >= since, Call.exclude_from_rating == False)
 
     # Stats
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0

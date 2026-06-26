@@ -58,6 +58,17 @@ export interface Call {
   client_tone: string | null;
   strengths: string[] | null;
   growth_areas: string[] | null;
+  exclude_from_rating: boolean;
+  client_data: {
+    request: string | null;
+    income_source: string | null;
+    age: string | null;
+    city: string | null;
+    purchase_readiness: string | null;
+    main_objections: string[] | null;
+    result_timeline: string | null;
+  } | null;
+  conversation: { speaker: 'manager' | 'client'; text: string; timestamp: number }[] | null;
 }
 
 export interface CallListResponse {

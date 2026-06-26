@@ -127,6 +127,18 @@ def _build_prompt(criteria: list[dict], kb_context: str) -> str:
   "keywords_found": ["ключевые слова"],
   "emotions": {{
     "manager_speech_ratio": число (0-100, процент времени менеджера)
+  }},
+  "conversation": [
+    {{"speaker": "manager" или "client", "text": "реплика", "timestamp": число (сек от начала звонка)}}
+  ],
+  "client_data": {{
+    "request": "запрос клиента",
+    "income_source": "откуда деньги/чем зарабатывает",
+    "age": "возраст или null",
+    "city": "город или null",
+    "purchase_readiness": "готовность купить (высокая/средняя/низкая)",
+    "main_objections": ["главные возражения"],
+    "result_timeline": "когда хочет результат"
   }}
 }}
 

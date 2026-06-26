@@ -50,6 +50,9 @@ class CallResponse(BaseModel):
     client_tone: str | None = None
     strengths: list[str] | None = None
     growth_areas: list[str] | None = None
+    exclude_from_rating: bool = False
+    client_data: dict | None = None
+    conversation: list[dict] | None = None
 
     model_config = {"from_attributes": True}
 

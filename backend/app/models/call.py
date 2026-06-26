@@ -50,6 +50,9 @@ class Call(Base):
 
     # Source
     source = Column(String(50), default="upload")  # upload / google_drive
+
+    # Exclude from rating
+    exclude_from_rating = Column(Boolean, default=False, nullable=False)
     source_file_id = Column(String(500), nullable=True)
 
     # Timestamps
