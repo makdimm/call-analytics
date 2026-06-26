@@ -89,6 +89,8 @@ const ADMIN_ITEMS = [
   { text: 'Загрузить', icon: <CloudUploadIcon />, path: '/upload' },
   { text: 'Google Drive', icon: <CloudSyncIcon />, path: '/gdrive' },
   { text: 'Менеджеры', icon: <PeopleIcon />, path: '/users' },
+  { text: 'Критерии', icon: <DashboardIcon />, path: '/criteria-settings' },
+  { text: 'База знаний', icon: <DashboardIcon />, path: '/knowledge-base' },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

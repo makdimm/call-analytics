@@ -53,6 +53,8 @@ app.add_middleware(
 from app.api import auth_router, calls_router, analytics_router, users_router
 from app.api.ws import router as ws_router
 from app.api.gdrive import router as gdrive_router
+from app.api.criteria_api import router as criteria_router
+from app.api.knowledge_api import router as knowledge_router
 
 app.include_router(auth_router)
 app.include_router(calls_router)
@@ -60,6 +62,8 @@ app.include_router(analytics_router)
 app.include_router(users_router)
 app.include_router(ws_router)
 app.include_router(gdrive_router)
+app.include_router(criteria_router)
+app.include_router(knowledge_router)
 
 
 @app.get("/api/health")

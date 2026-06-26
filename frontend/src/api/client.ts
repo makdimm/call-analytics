@@ -62,4 +62,5 @@ export const getManagerDetail = (managerId: number, days = 30) =>
 // Seed (dev only)
 export const seedDev = () => api.post('/seed').then((r) => r.data);
 
+export { api };
 export default api;

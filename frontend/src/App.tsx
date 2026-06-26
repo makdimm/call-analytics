@@ -10,6 +10,8 @@ import UsersPage from './pages/Users';
 import UploadPage from './pages/Upload';
 import GDriveSyncPage from './pages/GDriveSync';
 import ManagerDetailPage from './pages/ManagerDetail';
+import CriteriaSettingsPage from './pages/CriteriaSettings';
+import KnowledgeBasePage from './pages/KnowledgeBase';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -47,6 +49,10 @@ export default function App() {
           <Route path="/users/:id" element={<AdminRoute><ManagerDetailPage /></AdminRoute>} />
           <Route path="/upload" element={<AdminRoute><UploadPage /></AdminRoute>} />
           <Route path="/gdrive" element={<AdminRoute><GDriveSyncPage /></AdminRoute>} />
+
+          {/* New admin pages */}
+          <Route path="/criteria-settings" element={<AdminRoute><CriteriaSettingsPage /></AdminRoute>} />
+          <Route path="/knowledge-base" element={<AdminRoute><KnowledgeBasePage /></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

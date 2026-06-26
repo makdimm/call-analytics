@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
-from app.core.database import get_db
+from app.core.database import get_db, async_session_factory
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.call import Call, CallStatus, ScriptCompliance
@@ -209,7 +209,7 @@ async def process_call(call_id: int):
 
             # Stage 3: Analyze with GPT
             await _broadcast_progress(call_id, "processing", 90, "Анализ GPT-4o-mini...")
-            analysis = await analyze_transcript(call.transcript)
+            analysis = await analyze_transcript(call.transcript, db_factory=async_session_factory)
 
             call.analysis = analysis
             call.compliance_score = analysis.get("compliance", {}).get("score")
