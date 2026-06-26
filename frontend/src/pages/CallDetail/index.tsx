@@ -108,18 +108,29 @@ export default function CallDetailPage() {
     loadCall();
   };
 
-  const toggleAudio = () => {
+  const toggleAudio = async () => {
     if (!call) return;
     if (audioPlaying && audioEl) {
       audioEl.pause();
       setAudioPlaying(false);
       return;
     }
-    const aud = new Audio(`/api/calls/${call.id}/audio`);
-    aud.onended = () => setAudioPlaying(false);
-    aud.play();
-    setAudioEl(aud);
-    setAudioPlaying(true);
+    try {
+      // Fetch audio with auth headers, create blob URL
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`/api/calls/${call.id}/audio`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const aud = new Audio(url);
+      aud.onended = () => { setAudioPlaying(false); URL.revokeObjectURL(url); };
+      aud.play();
+      setAudioEl(aud);
+      setAudioPlaying(true);
+    } catch (e) {
+      console.error('Audio error:', e);
+    }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
