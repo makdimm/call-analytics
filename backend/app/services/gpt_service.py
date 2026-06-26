@@ -6,6 +6,8 @@ from app.core.config import settings
 
 def _safe_parse_json(text: str) -> dict:
     """Parse GPT JSON output with multiple repair strategies."""
+    import logging
+    log = logging.getLogger(__name__)
     text = text.strip()
     # Strip markdown code fences
     if text.startswith("```json"):
@@ -15,6 +17,10 @@ def _safe_parse_json(text: str) -> dict:
     if text.endswith("```"):
         text = text[:-3]
     text = text.strip()
+
+    # Debug: log raw response for analysis
+    log.warning(f"GPT JSON raw (first 500): {text[:500]}")
+    log.warning(f"GPT JSON raw (last 300): {text[-300:]}")
 
     # Strategy 1: direct parse
     try:
@@ -68,10 +74,24 @@ def _safe_parse_json(text: str) -> dict:
     except Exception:
         pass
 
-    # All strategies failed — return partial result with error
-    # Extract whatever we can salvage
-    import logging
-    logging.getLogger(__name__).warning(f"Failed to parse GPT JSON. Response length: {len(text)}")
+    # All strategies failed — extract whatever JSON-like content exists
+    log.warning(f"Failed to parse GPT JSON. Response: {text[:1000]}...{text[-200:]}")
+    # Last resort: try to find any complete {...} object
+    for s in ['{', '[']:
+        e = '}' if s == '{' else ']'
+        start = text.find(s)
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(text)):
+                if text[i] == s: depth += 1
+                elif text[i] == e:
+                    depth -= 1
+                    if depth == 0 and i - start > 20:
+                        try:
+                            return json.loads(text[start:i+1], strict=False)
+                        except Exception:
+                            pass
+    
     return {
         "compliance": {"score": 0, "level": "partial", "details": "Ошибка парсинга ответа AI"},
         "summary": "Не удалось обработать ответ нейросети",
