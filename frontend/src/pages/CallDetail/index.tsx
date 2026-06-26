@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import PersonIcon from '@mui/icons-material/Person';
@@ -110,6 +111,13 @@ export default function CallDetailPage() {
     if (!call) return;
     await api.patch(`/calls/${call.id}/exclude-rating?exclude=${!call.exclude_from_rating}`);
     loadCall();
+  };
+
+  const deleteCall = async () => {
+    if (!call) return;
+    if (!confirm(`Удалить звонок «${call.original_filename}»?`)) return;
+    await api.delete(`/calls/${call.id}`);
+    navigate('/calls');
   };
 
   const loadAndPlay = async () => {
@@ -252,6 +260,15 @@ export default function CallDetailPage() {
             </Typography>
             <Switch checked={call.exclude_from_rating} onChange={toggleExclude} size="small" />
           </Box>
+          <Divider orientation="vertical" flexItem />
+          <Button
+            onClick={deleteCall}
+            startIcon={<DeleteForeverIcon />}
+            size="small"
+            sx={{ textTransform: 'none', color: '#ef4444', fontSize: 13, fontWeight: 500, '&:hover': { bgcolor: '#fef2f2' } }}
+          >
+            Удалить
+          </Button>
         </Box>
         {/* Progress bar + time */}
         {(audioPlaying || audioEl) && (
