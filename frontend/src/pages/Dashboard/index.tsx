@@ -4,7 +4,7 @@ import { getDashboard, getCalls } from '../../api/client';
 import type { DashboardStats, Call } from '../../types';
 import {
   Box, Grid, Typography, Paper, Chip, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, CircularProgress, Button,
+  TableHead, TableRow, CircularProgress, Button, Tooltip,
 } from '@mui/material';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -12,7 +12,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
+  Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 import StatCard from '../../components/StatCard';
 
@@ -112,22 +112,32 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Всего звонков" value={data.total_calls} icon={<PhoneIcon />} color="#3b82f6" />
+          <Tooltip title="Общее количество загруженных звонков" arrow>
+            <Box><StatCard title="Всего звонков" value={data.total_calls} icon={<PhoneIcon />} color="#3b82f6" /></Box>
+          </Tooltip>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="Обработано" value={data.processed_calls} icon={<CheckCircleIcon />} color="#10b981" />
+          <Tooltip title="Звонки, по которым завершён полный анализ (транскрипция + GPT)" arrow>
+            <Box><StatCard title="Обработано" value={data.processed_calls} icon={<CheckCircleIcon />} color="#10b981" /></Box>
+          </Tooltip>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard title="В обработке" value={data.pending_calls} icon={<HourglassEmptyIcon />} color="#f59e0b" />
+          <Tooltip title="Звонки в очереди на обработку (транскрибация или анализ)" arrow>
+            <Box><StatCard title="В обработке" value={data.pending_calls} icon={<HourglassEmptyIcon />} color="#f59e0b" /></Box>
+          </Tooltip>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="Средний FG"
-            value={data.avg_fg_score != null ? `${Math.round(data.avg_fg_score)}%` : '-'}
-            icon={<TrendingUpIcon />}
-            color="#8b5cf6"
-            subtitle={data.failed_calls > 0 ? `${data.failed_calls} ошибок` : undefined}
-          />
+          <Tooltip title="Средний FG Score по всем обработанным звонкам. FG = сумма баллов по критериям / макс. сумма × 100%" arrow>
+            <Box>
+              <StatCard
+                title="Средний FG"
+                value={data.avg_fg_score != null ? `${Math.round(data.avg_fg_score)}%` : '-'}
+                icon={<TrendingUpIcon />}
+                color="#8b5cf6"
+                subtitle={data.failed_calls > 0 ? `${data.failed_calls} ошибок` : undefined}
+              />
+            </Box>
+          </Tooltip>
         </Grid>
       </Grid>
 
@@ -146,7 +156,7 @@ export default function DashboardPage() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -171,7 +181,7 @@ export default function DashboardPage() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -196,7 +206,7 @@ export default function DashboardPage() {
                       <Cell key={i} fill={WARMTH_COLORS[Object.keys(data.warmth_distribution)[i]] || COLORS[i]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -222,7 +232,7 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                   <XAxis dataKey="name" stroke="#9ca3af" tick={{ fontSize: 12 }} />
                   <YAxis domain={[0, 100]} stroke="#9ca3af" tick={{ fontSize: 12 }} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
+                  <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
                   <Bar dataKey="fg_score" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="FG %" />
                   <Bar dataKey="compliance" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Скрипт %" />
                 </BarChart>

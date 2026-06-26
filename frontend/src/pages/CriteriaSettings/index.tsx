@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Button, Chip, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Switch, CircularProgress, Alert,
+  DialogActions, TextField, Switch, CircularProgress, Alert, Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -96,12 +96,36 @@ export default function CriteriaSettingsPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Порядок</TableCell>
-                <TableCell>Key</TableCell>
-                <TableCell>Название</TableCell>
-                <TableCell>Вес</TableCell>
-                <TableCell>Активен</TableCell>
-                <TableCell align="right">Действия</TableCell>
+                <TableCell>
+                  <Tooltip title="Очередность отображения в GPT-промпте и в интерфейсе. Чем меньше число, тем выше" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Порядок</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Уникальное машинное имя (латиница). Используется в JSON-ответе GPT" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Key</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Название критерия, которое видит пользователь в интерфейсе" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Название</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Вес критерия в итоговом FG Score. Чем выше — тем сильнее влияет на оценку" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Вес</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Выключенные критерии не передаются GPT и не участвуют в оценке" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Активен</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Редактировать или удалить критерий" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Действия</Typography>
+                  </Tooltip>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -131,17 +155,35 @@ export default function CriteriaSettingsPage() {
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField label="Key (машинное имя)" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} size="small" fullWidth disabled={!!editId} />
-              <TextField label="Название" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} size="small" fullWidth />
+              <Tooltip title="Уникальный идентификатор на латинице (напр. greeting, speech). Меняется только при создании" arrow>
+                <TextField label="Key (машинное имя)" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} size="small" fullWidth disabled={!!editId} />
+              </Tooltip>
+              <Tooltip title="Название критерия, отображаемое в интерфейсе и в подсказке GPT" arrow>
+                <TextField label="Название" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} size="small" fullWidth />
+              </Tooltip>
             </Box>
-            <TextField label="Описание" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} size="small" fullWidth multiline rows={2} />
-            <TextField label="На что смотреть" value={form.what_to_check} onChange={(e) => setForm({ ...form, what_to_check: e.target.value })} size="small" fullWidth multiline rows={2} />
-            <TextField label="Оценка ДА (1)" value={form.good_example} onChange={(e) => setForm({ ...form, good_example: e.target.value })} size="small" fullWidth />
-            <TextField label="Оценка ПОЛУДА (0.5)" value={form.partial_example} onChange={(e) => setForm({ ...form, partial_example: e.target.value })} size="small" fullWidth />
-            <TextField label="Оценка НЕТ (0)" value={form.bad_example} onChange={(e) => setForm({ ...form, bad_example: e.target.value })} size="small" fullWidth />
+            <Tooltip title="Описание критерия для GPT. Чем подробнее — тем точнее оценка" arrow>
+              <TextField label="Описание" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} size="small" fullWidth multiline rows={2} />
+            </Tooltip>
+            <Tooltip title="Конкретные маркеры, на которые GPT должен обращать внимание при оценке" arrow>
+              <TextField label="На что смотреть" value={form.what_to_check} onChange={(e) => setForm({ ...form, what_to_check: e.target.value })} size="small" fullWidth multiline rows={2} />
+            </Tooltip>
+            <Tooltip title="Пример идеального выполнения критерия. GPT ориентируется на этот текст" arrow>
+              <TextField label="Оценка ДА (1)" value={form.good_example} onChange={(e) => setForm({ ...form, good_example: e.target.value })} size="small" fullWidth />
+            </Tooltip>
+            <Tooltip title="Пример частичного выполнения. Что считается 'почти хорошо, но не идеально'" arrow>
+              <TextField label="Оценка ПОЛУДА (0.5)" value={form.partial_example} onChange={(e) => setForm({ ...form, partial_example: e.target.value })} size="small" fullWidth />
+            </Tooltip>
+            <Tooltip title="Пример провала критерия. Когда GPT должен поставить 0" arrow>
+              <TextField label="Оценка НЕТ (0)" value={form.bad_example} onChange={(e) => setForm({ ...form, bad_example: e.target.value })} size="small" fullWidth />
+            </Tooltip>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <TextField label="Вес (max_score)" type="number" value={form.max_score} onChange={(e) => setForm({ ...form, max_score: Number(e.target.value) })} size="small" sx={{ width: 150 }} />
-              <TextField label="Порядок сортировки" type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} size="small" sx={{ width: 150 }} />
+              <Tooltip title="Сколько баллов даёт этот критерий в общей сумме FG. Чем выше — тем важнее критерий" arrow>
+                <TextField label="Вес (max_score)" type="number" value={form.max_score} onChange={(e) => setForm({ ...form, max_score: Number(e.target.value) })} size="small" sx={{ width: 150 }} />
+              </Tooltip>
+              <Tooltip title="Очередность отображения в интерфейсе и в промпте GPT. Меньше = выше" arrow>
+                <TextField label="Порядок сортировки" type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} size="small" sx={{ width: 150 }} />
+              </Tooltip>
             </Box>
           </Box>
         </DialogContent>

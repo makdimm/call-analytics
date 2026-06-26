@@ -4,7 +4,7 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Button, Chip, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Switch, CircularProgress, Alert, Select, MenuItem,
-  InputLabel, FormControl, LinearProgress,
+  InputLabel, FormControl, LinearProgress, Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -168,11 +168,31 @@ export default function KnowledgeBasePage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Название</TableCell>
-                <TableCell>Категория</TableCell>
-                <TableCell>Содержание</TableCell>
-                <TableCell>Активна</TableCell>
-                <TableCell align="right">Действия</TableCell>
+                <TableCell>
+                  <Tooltip title="Название записи в базе знаний" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Название</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Категория: Общее / Продукт / Скрипт / Возражения / Конкуренты / FAQ" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Категория</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Содержимое записи (обрезано до 500 символов). Эта информация подмешивается в промпт GPT" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Содержание</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Выключенные записи не передаются GPT" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Активна</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Редактировать или удалить запись" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Действия</Typography>
+                  </Tooltip>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

@@ -13,7 +13,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import MicIcon from '@mui/icons-material/Mic';
 import StatCard from '../../components/StatCard';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from 'recharts';
 
 const CRITERIA_LABELS: Record<string, string> = {
@@ -134,7 +134,7 @@ export default function ManagerDetailPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" stroke="#9ca3af" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" height={60} />
               <YAxis domain={[0, 1]} stroke="#9ca3af" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
+              <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
               <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Средняя оценка" />
             </BarChart>
           </ResponsiveContainer>

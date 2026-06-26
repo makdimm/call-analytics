@@ -6,7 +6,7 @@ import { useWebSocket } from '../../contexts/WebSocketContext';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Chip, TablePagination, CircularProgress, Dialog, DialogTitle,
-  DialogContent, IconButton, Grid, LinearProgress,
+  DialogContent, IconButton, Grid, LinearProgress, Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -137,11 +137,23 @@ export default function CallsPage() {
                 <TableRow>
                   <TableCell>Файл</TableCell>
                   <TableCell>Менеджер</TableCell>
-                  <TableCell>Тип</TableCell>
+                  <TableCell>
+                    <Tooltip title="Тип звонка: Новая заявка / Ускорение / Уточнение / Автоответ" arrow>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Тип</Typography>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>Длит.</TableCell>
                   <TableCell>Статус</TableCell>
-                  <TableCell>FG</TableCell>
-                  <TableCell>Скрипт</TableCell>
+                  <TableCell>
+                    <Tooltip title="FG Score — итоговая оценка качества звонка. Сумма баллов по всем критериям / max × 100" arrow>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>FG</Typography>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Оценка следования скрипту продаж" arrow>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Скрипт</Typography>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>Дата</TableCell>
                 </TableRow>
               </TableHead>
@@ -235,23 +247,31 @@ export default function CallsPage() {
                   <Chip label={statusStyle(selectedCall.status).label} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: statusStyle(selectedCall.status).bg, color: statusStyle(selectedCall.status).color }} />
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>FG Оценка</Typography>
+                  <Tooltip title="FG Score — итоговая оценка звонка %. Сумма баллов по критериям / максимум × 100" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>FG Оценка</Typography>
+                  </Tooltip>
                   <Typography sx={{ fontSize: 22, fontWeight: 700, color: scoreColor(selectedCall.fg_score) }}>
                     {selectedCall.fg_score != null ? `${Math.round(selectedCall.fg_score)}%` : '-'}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Compliance</Typography>
+                  <Tooltip title="Compliance — оценка соблюдения скрипта продаж (0-100%)" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Compliance</Typography>
+                  </Tooltip>
                   <Typography sx={{ fontSize: 22, fontWeight: 700, color: scoreColor(selectedCall.compliance_score) }}>
                     {selectedCall.compliance_score != null ? `${Math.round(selectedCall.compliance_score)}%` : '-'}
                   </Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Тип звонка</Typography>
+                  <Tooltip title="Тип звонка: Новая заявка (первичный), Ускорение (клиент в работе), Уточнение, Автоответ (нецелевой)" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Тип звонка</Typography>
+                  </Tooltip>
                   <Chip label={CALL_TYPE_LABELS[selectedCall.call_type || ''] || selectedCall.call_type || '-'} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: '#f3f4f6', color: '#6b7280' }} />
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Теплота</Typography>
+                  <Tooltip title="Теплота клиента: Холодный / Теплый / Горячий / Нецелевой" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Теплота</Typography>
+                  </Tooltip>
                   {selectedCall.warmth && WARMTH_LABELS[selectedCall.warmth] ? (
                     <Chip label={WARMTH_LABELS[selectedCall.warmth].label} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: WARMTH_LABELS[selectedCall.warmth].bg, color: WARMTH_LABELS[selectedCall.warmth].color }} />
                   ) : <Typography sx={{ fontSize: 14, color: '#9ca3af' }}>-</Typography>}
@@ -261,7 +281,9 @@ export default function CallsPage() {
                   <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{selectedCall.duration_seconds ? `${Math.round(selectedCall.duration_seconds)}с` : '-'}</Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Речь менеджера</Typography>
+                  <Tooltip title="Процент времени звонка, в течение которого говорит менеджер (а не клиент)" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Речь менеджера</Typography>
+                  </Tooltip>
                   <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{selectedCall.talk_ratio != null ? `${Math.round(selectedCall.talk_ratio)}%` : '-'}</Typography>
                 </Grid>
                 {selectedCall.manager_tone && (
@@ -278,7 +300,9 @@ export default function CallsPage() {
                 )}
                 {selectedCall.objection_count != null && (
                   <Grid size={{ xs: 6, md: 3 }}>
+                    <Tooltip title="Количество и типы возражений клиента, зафиксированные GPT" arrow>
                     <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Возражения</Typography>
+                  </Tooltip>
                     <Typography sx={{ fontSize: 14, color: '#1f2937' }}>
                       {selectedCall.objection_count > 0 ? `${selectedCall.objection_count} шт.` : 'Нет'}
                       {selectedCall.objection_types?.length ? ` (${selectedCall.objection_types.join(', ')})` : ''}
@@ -290,9 +314,11 @@ export default function CallsPage() {
               {/* Criteria scores */}
               {selectedCall.criteria_scores && Object.keys(selectedCall.criteria_scores).length > 0 && (
                 <Box sx={{ mb: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#fafafa', border: '1px solid #e5e7eb' }}>
-                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151', mb: 2 }}>
-                    Оценка по критериям
-                  </Typography>
+                  <Tooltip title="Оценка каждого критерия: зелёный = ДА (1), жёлтый = ПОЛУДА (0.5), красный = НЕТ (0). Чем выше вес критерия, тем сильнее он влияет на итоговый FG" arrow>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151', mb: 2 }}>
+                      Оценка по критериям
+                    </Typography>
+                  </Tooltip>
                   <Grid container spacing={2}>
                     {Object.entries(CRITERIA_LABELS).map(([key, label]) => {
                       const val = (selectedCall.criteria_scores as Record<string, number>)[key];

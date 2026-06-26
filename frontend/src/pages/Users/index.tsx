@@ -6,11 +6,11 @@ import type { User, DashboardStats } from '../../types';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Chip, CircularProgress, Button, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField,
+  DialogContent, DialogActions, TextField, Tooltip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
@@ -92,7 +92,7 @@ export default function UsersPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" stroke="#9ca3af" tick={{ fontSize: 12 }} />
               <YAxis domain={[0, 100]} stroke="#9ca3af" tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f9fafb' }} />
+              <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: '#f9fafb' }} />
               <Bar dataKey="fg" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="FG" />
               <Bar dataKey="score" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Скрипт" />
               <Bar dataKey="talk" fill="#10b981" radius={[4, 4, 0, 0]} name="Речь" />
@@ -108,12 +108,36 @@ export default function UsersPage() {
               <TableRow>
                 <TableCell>Имя</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>Звонков</TableCell>
-                <TableCell>FG</TableCell>
-                <TableCell>Скрипт</TableCell>
-                <TableCell>Речь</TableCell>
-                <TableCell>Статус</TableCell>
-                <TableCell align="right">Действия</TableCell>
+                <TableCell>
+                  <Tooltip title="Проанализировано / Всего" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Звонков</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Средний FG Score менеджера — итоговая оценка качества звонков" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>FG</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Средний % соблюдения скрипта" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Скрипт</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Средний % времени звонка, когда говорит менеджер" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Речь</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <Tooltip title="Активен / Неактивен" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Статус</Typography>
+                  </Tooltip>
+                </TableCell>
+                <TableCell align="right">
+                  <Tooltip title="Удалить менеджера" arrow>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Действия</Typography>
+                  </Tooltip>
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
