@@ -214,15 +214,28 @@ async def process_call(call_id: int):
             call.analysis = analysis
             call.compliance_score = analysis.get("compliance", {}).get("score")
             compliance_level = analysis.get("compliance", {}).get("level", "non_compliant")
-            call.script_compliance = ScriptCompliance(compliance_level)
+            if compliance_level in [e.value for e in ScriptCompliance]:
+                call.script_compliance = ScriptCompliance(compliance_level)
 
-            manager_ratio = analysis.get("manager_speech_ratio")
-            if manager_ratio is not None:
-                call.talk_ratio = manager_ratio
-
-            call.emotions = analysis.get("emotions")
+            # Extract new-style metrics
+            emotions = analysis.get("emotions") or {}
+            call.talk_ratio = emotions.get("manager_speech_ratio") if isinstance(emotions, dict) else analysis.get("manager_speech_ratio")
+            call.emotions = emotions
             call.keywords_found = analysis.get("keywords_found", [])
-            call.objections_handled = analysis.get("objections")
+
+            # Store objection info in objections_handled (backwards compatible)
+            obj_types = analysis.get("objection_types", [])
+            call.objections_handled = {
+                "count": analysis.get("objection_count", 0),
+                "types": obj_types,
+                "handled": analysis.get("objection_count", 0) > 0,
+            }
+
+            # Store call_type in DB column for filtering
+            try:
+                call.call_type = analysis.get("call_type", "acceleration")
+            except Exception:
+                pass
 
             call.status = CallStatus.ANALYZED
             call.processed_at = datetime.now(timezone.utc)
@@ -238,17 +251,18 @@ async def process_call(call_id: int):
 
 
 def _call_to_response(call: Call) -> CallResponse:
+    analysis = call.analysis or {}
     return CallResponse(
         id=call.id,
         manager_id=call.manager_id,
         manager_name=call.manager.username if call.manager else None,
         original_filename=call.original_filename,
         duration_seconds=call.duration_seconds,
-        status=call.status,
+        status=call.status.value if call.status else None,
         transcript=call.transcript,
         transcript_confidence=call.transcript_confidence,
         analysis=call.analysis,
-        script_compliance=call.script_compliance,
+        script_compliance=call.script_compliance.value if call.script_compliance else None,
         compliance_score=call.compliance_score,
         talk_ratio=call.talk_ratio,
         emotions=call.emotions,
@@ -258,4 +272,15 @@ def _call_to_response(call: Call) -> CallResponse:
         source=call.source,
         created_at=call.created_at,
         processed_at=call.processed_at,
+        # New competitor-inspired fields from analysis JSON
+        call_type=analysis.get("call_type") or getattr(call, "call_type", None),
+        warmth=analysis.get("warmth"),
+        fg_score=analysis.get("fg_score"),
+        criteria_scores=analysis.get("criteria_scores"),
+        objection_count=analysis.get("objection_count"),
+        objection_types=analysis.get("objection_types"),
+        manager_tone=analysis.get("manager_tone"),
+        client_tone=analysis.get("client_tone"),
+        strengths=analysis.get("strengths"),
+        growth_areas=analysis.get("growth_areas"),
     )

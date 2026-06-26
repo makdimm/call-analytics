@@ -1,7 +1,21 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Any
-from app.models.call import CallStatus, ScriptCompliance
+
+
+class CriteriaScores(BaseModel):
+    greeting: float = 0
+    speech: float = 0
+    initiative: float = 0
+    programming: float = 0
+    qualification: float = 0
+    pain: float = 0
+    product: float = 0
+    expertise: float = 0
+    closing: float = 0
+    push: float = 0
+    next_step: float = 0
+    framing: float = 0
 
 
 class CallResponse(BaseModel):
@@ -10,11 +24,11 @@ class CallResponse(BaseModel):
     manager_name: str | None = None
     original_filename: str
     duration_seconds: float | None = None
-    status: CallStatus
+    status: str
     transcript: str | None = None
     transcript_confidence: float | None = None
     analysis: dict[str, Any] | None = None
-    script_compliance: ScriptCompliance | None = None
+    script_compliance: str | None = None
     compliance_score: float | None = None
     talk_ratio: float | None = None
     emotions: dict | None = None
@@ -24,6 +38,18 @@ class CallResponse(BaseModel):
     source: str | None = "upload"
     created_at: datetime
     processed_at: datetime | None = None
+
+    # New competitor-inspired fields
+    call_type: str | None = None
+    warmth: str | None = None
+    fg_score: float | None = None
+    criteria_scores: dict[str, float] | None = None
+    objection_count: int | None = None
+    objection_types: list[str] | None = None
+    manager_tone: str | None = None
+    client_tone: str | None = None
+    strengths: list[str] | None = None
+    growth_areas: list[str] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -41,8 +67,9 @@ class CallUpdate(BaseModel):
 
 class CallFilterParams(BaseModel):
     manager_id: int | None = None
-    status: CallStatus | None = None
-    compliance: ScriptCompliance | None = None
+    status: str | None = None
+    compliance: str | None = None
+    call_type: str | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
     page: int = 1

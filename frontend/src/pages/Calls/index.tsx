@@ -20,6 +20,75 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; label: string }
   uploaded: { bg: '#f3f4f6', color: '#6b7280', label: 'Загружен' },
 };
 
+const CALL_TYPE_LABELS: Record<string, string> = {
+  new_lead: 'Новая заявка',
+  acceleration: 'Ускорение',
+  clarification: 'Уточнение',
+  auto_answer: 'Автоответ',
+};
+
+const WARMTH_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  cold: { label: 'Холодный', color: '#6366f1', bg: '#eef2ff' },
+  warm: { label: 'Теплый', color: '#f59e0b', bg: '#fffbeb' },
+  hot: { label: 'Горячий', color: '#ef4444', bg: '#fef2f2' },
+  non_target: { label: 'Нецелевой', color: '#9ca3af', bg: '#f3f4f6' },
+};
+
+const CRITERIA_LABELS: Record<string, string> = {
+  greeting: 'Приветствие',
+  speech: 'Речь',
+  initiative: 'Инициатива',
+  programming: 'Программирование',
+  qualification: 'Квалификация',
+  pain: 'Боль',
+  product: 'Продукт',
+  expertise: 'Экспертность',
+  closing: 'Закрытие',
+  push: 'Дожим',
+  next_step: 'След. шаг',
+  framing: 'Фрейминг',
+};
+
+const TONE_LABELS: Record<string, string> = {
+  friendly: 'Дружелюбный',
+  neutral: 'Нейтральный',
+  pushy: 'Навязчивый',
+  uncertain: 'Неуверенный',
+  interested: 'Заинтересован',
+  irritated: 'Раздражен',
+  negative: 'Негативный',
+};
+
+function scoreColor(score: number | null | undefined): string {
+  if (score == null) return '#9ca3af';
+  if (score >= 70) return '#10b981';
+  if (score >= 40) return '#f59e0b';
+  return '#ef4444';
+}
+
+function CriteriaBar({ label, value }: { label: string; value: number }) {
+  const pct = value * 100;
+  const hue = value >= 0.8 ? '#10b981' : value >= 0.4 ? '#f59e0b' : '#ef4444';
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+        <Typography sx={{ fontSize: 13, color: '#374151' }}>{label}</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: hue }}>
+          {value === 1 ? 'Да' : value === 0.5 ? 'ПолуДа' : 'Нет'}
+        </Typography>
+      </Box>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        sx={{
+          height: 6, borderRadius: 3, bgcolor: '#e5e7eb',
+          '& .MuiLinearProgress-bar': { bgcolor: hue, borderRadius: 3 },
+        }}
+      />
+    </Box>
+  );
+}
+
 export default function CallsPage() {
   const [calls, setCalls] = useState<Call[]>([]);
   const [total, setTotal] = useState(0);
@@ -68,19 +137,17 @@ export default function CallsPage() {
                 <TableRow>
                   <TableCell>Файл</TableCell>
                   <TableCell>Менеджер</TableCell>
+                  <TableCell>Тип</TableCell>
                   <TableCell>Длит.</TableCell>
                   <TableCell>Статус</TableCell>
-                  <TableCell>Прогресс</TableCell>
+                  <TableCell>FG</TableCell>
                   <TableCell>Скрипт</TableCell>
-                  <TableCell>Оценка</TableCell>
                   <TableCell>Дата</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {calls.map((call) => {
                   const st = statusStyle(call.status);
-                  const prog = callProgress.get(call.id);
-                  const isProcessing = call.status === 'processing';
                   return (
                     <TableRow
                       key={call.id} hover
@@ -93,49 +160,21 @@ export default function CallsPage() {
                       <TableCell sx={{ color: '#4b5563' }}>
                         {call.manager_name || `#${call.manager_id}`}
                       </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={CALL_TYPE_LABELS[call.call_type || ''] || call.call_type || '-'}
+                          size="small"
+                          sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: '#f3f4f6', color: '#6b7280' }}
+                        />
+                      </TableCell>
                       <TableCell sx={{ color: '#6b7280' }}>
                         {call.duration_seconds ? `${Math.round(call.duration_seconds)}с` : '-'}
                       </TableCell>
                       <TableCell>
                         <Chip label={st.label} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: st.bg, color: st.color }} />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 120 }}>
-                        {isProcessing ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={prog?.progress ?? call.progress}
-                                sx={{
-                                  height: 4, borderRadius: 2,
-                                  bgcolor: '#e5e7eb',
-                                  '& .MuiLinearProgress-bar': { bgcolor: '#3b82f6', borderRadius: 2 },
-                                }}
-                              />
-                            </Box>
-                            <Typography sx={{ fontSize: 11, color: '#6b7280', minWidth: 28, textAlign: 'right' }}>
-                              {prog?.progress ?? call.progress}%
-                            </Typography>
-                          </Box>
-                        ) : call.status === 'analyzed' ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={100}
-                                sx={{ height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: '#10b981', borderRadius: 2 } }}
-                              />
-                            </Box>
-                            <Typography sx={{ fontSize: 11, color: '#10b981', minWidth: 28, textAlign: 'right' }}>100%</Typography>
-                          </Box>
-                        ) : call.status === 'failed' ? (
-                          <Typography sx={{ fontSize: 12, color: '#ef4444' }}>—</Typography>
-                        ) : (
-                          <Typography sx={{ fontSize: 12, color: '#9ca3af' }}>—</Typography>
-                        )}
-                        {isProcessing && prog?.stage && (
-                          <Typography sx={{ fontSize: 11, color: '#6b7280', mt: 0.25 }}>{prog.stage}</Typography>
-                        )}
+                      <TableCell sx={{ fontWeight: 600, color: scoreColor(call.fg_score) }}>
+                        {call.fg_score != null ? `${Math.round(call.fg_score)}%` : '-'}
                       </TableCell>
                       <TableCell>
                         {call.script_compliance && (
@@ -149,9 +188,6 @@ export default function CallsPage() {
                             }}
                           />
                         )}
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: call.compliance_score != null && call.compliance_score >= 70 ? '#10b981' : call.compliance_score != null && call.compliance_score >= 40 ? '#f59e0b' : call.compliance_score != null ? '#ef4444' : '#9ca3af' }}>
-                        {call.compliance_score != null ? `${Math.round(call.compliance_score)}%` : '-'}
                       </TableCell>
                       <TableCell sx={{ color: '#9ca3af' }}>
                         {new Date(call.created_at).toLocaleDateString('ru')}
@@ -190,39 +226,86 @@ export default function CallsPage() {
             </DialogTitle>
             <DialogContent sx={{ py: 3 }}>
               <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid size={{ xs: 6, md: 4 }}>
+                <Grid size={{ xs: 6, md: 3 }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Менеджер</Typography>
                   <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{selectedCall.manager_name}</Typography>
                 </Grid>
-                <Grid size={{ xs: 6, md: 4 }}>
+                <Grid size={{ xs: 6, md: 3 }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Статус</Typography>
                   <Chip label={statusStyle(selectedCall.status).label} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: statusStyle(selectedCall.status).bg, color: statusStyle(selectedCall.status).color }} />
                 </Grid>
-                <Grid size={{ xs: 6, md: 4 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Оценка</Typography>
-                  <Typography sx={{ fontSize: 22, fontWeight: 700, color: selectedCall.compliance_score != null && selectedCall.compliance_score >= 70 ? '#10b981' : selectedCall.compliance_score != null && selectedCall.compliance_score >= 40 ? '#f59e0b' : selectedCall.compliance_score != null ? '#ef4444' : '#9ca3af' }}>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>FG Оценка</Typography>
+                  <Typography sx={{ fontSize: 22, fontWeight: 700, color: scoreColor(selectedCall.fg_score) }}>
+                    {selectedCall.fg_score != null ? `${Math.round(selectedCall.fg_score)}%` : '-'}
+                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Compliance</Typography>
+                  <Typography sx={{ fontSize: 22, fontWeight: 700, color: scoreColor(selectedCall.compliance_score) }}>
                     {selectedCall.compliance_score != null ? `${Math.round(selectedCall.compliance_score)}%` : '-'}
                   </Typography>
                 </Grid>
-                <Grid size={{ xs: 6, md: 4 }}>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Тип звонка</Typography>
+                  <Chip label={CALL_TYPE_LABELS[selectedCall.call_type || ''] || selectedCall.call_type || '-'} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: '#f3f4f6', color: '#6b7280' }} />
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Теплота</Typography>
+                  {selectedCall.warmth && WARMTH_LABELS[selectedCall.warmth] ? (
+                    <Chip label={WARMTH_LABELS[selectedCall.warmth].label} size="small" sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: WARMTH_LABELS[selectedCall.warmth].bg, color: WARMTH_LABELS[selectedCall.warmth].color }} />
+                  ) : <Typography sx={{ fontSize: 14, color: '#9ca3af' }}>-</Typography>}
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Длительность</Typography>
                   <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{selectedCall.duration_seconds ? `${Math.round(selectedCall.duration_seconds)}с` : '-'}</Typography>
                 </Grid>
-                <Grid size={{ xs: 6, md: 4 }}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Скрипт</Typography>
-                  {selectedCall.script_compliance && (
-                    <Chip
-                      label={selectedCall.script_compliance === 'compliant' ? 'По скрипту' : selectedCall.script_compliance === 'partial' ? 'Частично' : 'Не по скрипту'}
-                      size="small"
-                      sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: selectedCall.script_compliance === 'compliant' ? '#ecfdf5' : selectedCall.script_compliance === 'partial' ? '#fffbeb' : '#fef2f2', color: selectedCall.script_compliance === 'compliant' ? '#10b981' : selectedCall.script_compliance === 'partial' ? '#f59e0b' : '#ef4444' }}
-                    />
-                  )}
-                </Grid>
-                <Grid size={{ xs: 6, md: 4 }}>
+                <Grid size={{ xs: 6, md: 3 }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Речь менеджера</Typography>
                   <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{selectedCall.talk_ratio != null ? `${Math.round(selectedCall.talk_ratio)}%` : '-'}</Typography>
                 </Grid>
+                {selectedCall.manager_tone && (
+                  <Grid size={{ xs: 6, md: 3 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Тон менеджера</Typography>
+                    <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[selectedCall.manager_tone] || selectedCall.manager_tone}</Typography>
+                  </Grid>
+                )}
+                {selectedCall.client_tone && (
+                  <Grid size={{ xs: 6, md: 3 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Тон клиента</Typography>
+                    <Typography sx={{ fontSize: 14, color: '#1f2937' }}>{TONE_LABELS[selectedCall.client_tone] || selectedCall.client_tone}</Typography>
+                  </Grid>
+                )}
+                {selectedCall.objection_count != null && (
+                  <Grid size={{ xs: 6, md: 3 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Возражения</Typography>
+                    <Typography sx={{ fontSize: 14, color: '#1f2937' }}>
+                      {selectedCall.objection_count > 0 ? `${selectedCall.objection_count} шт.` : 'Нет'}
+                      {selectedCall.objection_types?.length ? ` (${selectedCall.objection_types.join(', ')})` : ''}
+                    </Typography>
+                  </Grid>
+                )}
               </Grid>
+
+              {/* Criteria scores */}
+              {selectedCall.criteria_scores && Object.keys(selectedCall.criteria_scores).length > 0 && (
+                <Box sx={{ mb: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#fafafa', border: '1px solid #e5e7eb' }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151', mb: 2 }}>
+                    Оценка по критериям
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {Object.entries(CRITERIA_LABELS).map(([key, label]) => {
+                      const val = (selectedCall.criteria_scores as Record<string, number>)[key];
+                      if (val === undefined) return null;
+                      return (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={key}>
+                          <CriteriaBar label={label} value={val} />
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                </Box>
+              )}
 
               {selectedCall.status === 'processing' && (
                 <Box sx={{ mb: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#f0f9ff', border: '1px solid #bae6fd' }}>
@@ -247,6 +330,7 @@ export default function CallsPage() {
                 </Box>
               )}
 
+              {/* Summary */}
               {selectedCall.analysis?.summary && (
                 <Box sx={{ mb: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#f0f9ff', border: '1px solid #bae6fd' }}>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#0369a1', mb: 0.5 }}>Саммари</Typography>
@@ -254,6 +338,55 @@ export default function CallsPage() {
                 </Box>
               )}
 
+              {/* Strengths & Growth Areas */}
+              <Grid container spacing={2} sx={{ mb: 2.5 }}>
+                {selectedCall.strengths && selectedCall.strengths.length > 0 && (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#166534', mb: 1 }}>✅ Сильные стороны</Typography>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {selectedCall.strengths.map((s, i) => (
+                          <li key={i}><Typography sx={{ fontSize: 13, color: '#166534' }}>{s}</Typography></li>
+                        ))}
+                      </ul>
+                    </Box>
+                  </Grid>
+                )}
+                {selectedCall.growth_areas && selectedCall.growth_areas.length > 0 && (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Box sx={{ p: 2, borderRadius: 2, bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400e', mb: 1 }}>📈 Что улучшить</Typography>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {selectedCall.growth_areas.map((s, i) => (
+                          <li key={i}><Typography sx={{ fontSize: 13, color: '#92400e' }}>{s}</Typography></li>
+                        ))}
+                      </ul>
+                    </Box>
+                  </Grid>
+                )}
+              </Grid>
+
+              {/* Analysis details */}
+              {selectedCall.analysis?.compliance && (
+                <Box sx={{ mb: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#fafafa', border: '1px solid #e5e7eb' }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151', mb: 1 }}>Детали анализа</Typography>
+                  {selectedCall.analysis.compliance?.details && (
+                    <Typography sx={{ fontSize: 13, color: '#6b7280', mb: 1 }}>{selectedCall.analysis.compliance.details}</Typography>
+                  )}
+                  {selectedCall.analysis.recommendations && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', mb: 0.5 }}>Рекомендации:</Typography>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {selectedCall.analysis.recommendations.map((r: string, i: number) => (
+                          <li key={i}><Typography sx={{ fontSize: 13, color: '#6b7280' }}>{r}</Typography></li>
+                        ))}
+                      </ul>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Transcript */}
               {selectedCall.transcript && (
                 <Box>
                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 1 }}>Транскрипция</Typography>
