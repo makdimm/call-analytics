@@ -316,7 +316,7 @@ async def analyze_transcript(transcript: str, db_factory=None, segments: list[di
         messages=[{"role": "system", "content": prompt}, {"role": "user", "content": user_input}],
         response_format={"type": "json_object"},
         temperature=0.3,
-        max_tokens=2500,
+        max_tokens=4000,
     )
 
     text = response.choices[0].message.content
