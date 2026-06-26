@@ -94,6 +94,10 @@ export default function CallDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0); // 0-100
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioCurrent, setAudioCurrent] = useState(0);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
 
@@ -108,15 +112,10 @@ export default function CallDetailPage() {
     loadCall();
   };
 
-  const toggleAudio = async () => {
+  const loadAndPlay = async () => {
     if (!call) return;
-    if (audioPlaying && audioEl) {
-      audioEl.pause();
-      setAudioPlaying(false);
-      return;
-    }
+    setAudioLoading(true);
     try {
-      // Fetch audio with auth headers, create blob URL
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/calls/${call.id}/audio`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -124,13 +123,57 @@ export default function CallDetailPage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const aud = new Audio(url);
-      aud.onended = () => { setAudioPlaying(false); URL.revokeObjectURL(url); };
+
+      aud.onloadedmetadata = () => {
+        setAudioDuration(aud.duration);
+      };
+      aud.ontimeupdate = () => {
+        setAudioCurrent(aud.currentTime);
+        if (aud.duration) setAudioProgress((aud.currentTime / aud.duration) * 100);
+      };
+      aud.onended = () => {
+        setAudioPlaying(false);
+        setAudioProgress(0);
+        setAudioCurrent(0);
+        URL.revokeObjectURL(url);
+      };
+
       aud.play();
       setAudioEl(aud);
       setAudioPlaying(true);
+      setAudioLoading(false);
     } catch (e) {
       console.error('Audio error:', e);
+      setAudioLoading(false);
     }
+  };
+
+  const togglePlay = () => {
+    if (!audioEl) {
+      loadAndPlay();
+      return;
+    }
+    if (audioPlaying) {
+      audioEl.pause();
+      setAudioPlaying(false);
+    } else {
+      audioEl.play();
+      setAudioPlaying(true);
+    }
+  };
+
+  const seekAudio = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioEl || !audioDuration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = x / rect.width;
+    audioEl.currentTime = pct * audioDuration;
+    setAudioProgress(pct * 100);
+  };
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60); const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
@@ -187,16 +230,16 @@ export default function CallDetailPage() {
 
       {/* Audio player + Exclude from rating */}
       <Paper sx={{ p: 2, mb: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <IconButton onClick={toggleAudio} sx={{
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: audioPlaying || audioEl ? 1.5 : 0 }}>
+          <IconButton onClick={togglePlay} disabled={audioLoading} sx={{
             bgcolor: '#3b82f6', color: '#fff', '&:hover': { bgcolor: '#2563eb' },
-            width: 44, height: 44,
+            width: 44, height: 44, '&.Mui-disabled': { bgcolor: '#93c5fd', color: '#fff' },
           }}>
-            {audioPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+            {audioLoading ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : audioPlaying ? <PauseIcon /> : <PlayArrowIcon />}
           </IconButton>
           <Box sx={{ flex: 1, minWidth: 120 }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>
-              {audioPlaying ? 'Воспроизведение...' : 'Прослушать запись'}
+              {audioLoading ? 'Загрузка...' : audioPlaying ? 'Воспроизводится' : audioEl ? 'На паузе' : 'Прослушать запись'}
             </Typography>
             <Typography sx={{ fontSize: 12, color: '#6b7280' }}>
               {call.original_filename} · {call.duration_seconds ? `${Math.round(call.duration_seconds)}с` : ''}
@@ -210,6 +253,35 @@ export default function CallDetailPage() {
             <Switch checked={call.exclude_from_rating} onChange={toggleExclude} size="small" />
           </Box>
         </Box>
+        {/* Progress bar + time */}
+        {(audioPlaying || audioEl) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 0.5 }}>
+            <Typography sx={{ fontSize: 11, color: '#9ca3af', minWidth: 30, textAlign: 'right' }}>
+              {fmtTime(audioCurrent)}
+            </Typography>
+            <Box
+              onClick={seekAudio}
+              sx={{
+                flex: 1, height: 20, display: 'flex', alignItems: 'center', cursor: 'pointer',
+                position: 'relative',
+              }}
+            >
+              <Box sx={{
+                width: '100%', height: 4, borderRadius: 2, bgcolor: '#e5e7eb',
+                overflow: 'hidden', position: 'relative',
+              }}>
+                <Box sx={{
+                  width: `${audioProgress}%`, height: '100%',
+                  bgcolor: '#3b82f6', borderRadius: 2,
+                  transition: 'width 0.1s linear',
+                }} />
+              </Box>
+            </Box>
+            <Typography sx={{ fontSize: 11, color: '#9ca3af', minWidth: 30 }}>
+              {fmtTime(audioDuration || call.duration_seconds || 0)}
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Scores row */}
