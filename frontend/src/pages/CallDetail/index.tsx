@@ -117,7 +117,7 @@ export default function CallDetailPage() {
     }
     try {
       // Fetch audio with auth headers, create blob URL
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const res = await fetch(`/api/calls/${call.id}/audio`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
