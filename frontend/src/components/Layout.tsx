@@ -113,7 +113,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             Call Analytics
           </Typography>
           <Typography sx={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.2 }}>
-            Whisper + GPT
+            OpenAI Whisper API + GPT
           </Typography>
         </Box>
       </Box>
