@@ -1,6 +1,84 @@
 import json
+import re
 from openai import AsyncOpenAI
 from app.core.config import settings
+
+
+def _safe_parse_json(text: str) -> dict:
+    """Parse GPT JSON output with multiple repair strategies."""
+    text = text.strip()
+    # Strip markdown code fences
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    # Strategy 1: direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: fix trailing commas + strict=False
+    fixed = re.sub(r',\s*([}\]])', r'\1', text)
+    try:
+        return json.loads(fixed, strict=False)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 3: close unterminated string at end
+    # Find the last incomplete string value and complete it
+    for end_char in ['"}', '"\n', '",']:
+        idx = fixed.rfind(end_char)
+        if idx > 10:
+            # Try to find the start of this string
+            start = fixed.rfind('"', 0, idx)
+            if start > 10 and fixed[start-1] in ':[, ':  # looks like a JSON value
+                fixed = fixed[:idx] + '"}' + fixed[idx+2:]  # close the string and object
+                try:
+                    obj_end = fixed.rfind('}')
+                    if obj_end > 10:
+                        return json.loads(fixed[:obj_end+1], strict=False)
+                except Exception:
+                    pass
+
+    # Strategy 4: truncate to last complete object and try
+    for end_char in ['}', ']']:
+        brace_count = 0
+        idx = len(text) - 1
+        while idx >= 0:
+            if text[idx] == end_char:
+                brace_count += 1
+            elif text[idx] == ('{' if end_char == '}' else '['):
+                brace_count -= 1
+                if brace_count == 0:
+                    try:
+                        return json.loads(text[:idx+1], strict=False)
+                    except Exception:
+                        break
+            idx -= 1
+
+    # Strategy 5: use json5 as last resort
+    try:
+        import json5
+        return json5.loads(fixed)
+    except Exception:
+        pass
+
+    # All strategies failed — return partial result with error
+    # Extract whatever we can salvage
+    import logging
+    logging.getLogger(__name__).warning(f"Failed to parse GPT JSON. Response length: {len(text)}")
+    return {
+        "compliance": {"score": 0, "level": "partial", "details": "Ошибка парсинга ответа AI"},
+        "summary": "Не удалось обработать ответ нейросети",
+        "fg_score": 0, "criteria_scores": {},
+        "call_type": "acceleration", "warmth": "warm",
+        "objection_count": 0,
+    }
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -222,41 +300,7 @@ async def analyze_transcript(transcript: str, db_factory=None, segments: list[di
     )
 
     text = response.choices[0].message.content
-    # Repair common JSON issues from GPT
-    text = text.strip()
-    if text.startswith("```json"):
-        text = text[7:]
-    if text.endswith("```"):
-        text = text[:-3]
-    text = text.strip()
-    try:
-        result = json.loads(text)
-    except json.JSONDecodeError:
-        # Try to fix common GPT JSON errors
-        fixed = text
-        # Fix unterminated strings (last string before closing brace)
-        import re as _re
-        # Remove trailing commas before } and ]
-        fixed = _re.sub(r',\s*([}\]])', r'\1', fixed)
-        # Try parsing with strict=False (allows trailing commas)
-        try:
-            import json5
-            result = json5.loads(fixed)
-        except Exception:
-            try:
-                result = json.loads(fixed, strict=False)
-            except Exception:
-                # Last resort: truncate to last valid JSON and retry
-                for end_char in ['}', ']']:
-                    idx = fixed.rfind(end_char)
-                    if idx > 10:
-                        try:
-                            result = json.loads(fixed[:idx+1], strict=False)
-                            break
-                        except Exception:
-                            pass
-                else:
-                    raise
+    result = _safe_parse_json(text)
 
     if "fg_score" not in result or result.get("fg_score") is None:
         cs = result.get("criteria_scores", {})
