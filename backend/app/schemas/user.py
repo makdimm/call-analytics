@@ -14,6 +14,13 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: UserRole = UserRole.MANAGER
+
+
 class UserUpdate(BaseModel):
     username: str | None = None
     email: str | None = None

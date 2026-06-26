@@ -4,11 +4,12 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Button, Chip, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Switch, CircularProgress, Alert, Select, MenuItem,
-  InputLabel, FormControl,
+  InputLabel, FormControl, LinearProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SearchIcon from '@mui/icons-material/Search';
 
 interface KBEntry {
@@ -41,6 +42,14 @@ export default function KnowledgeBasePage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
+
+  // Upload state
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCategory, setUploadCategory] = useState('general');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -76,6 +85,44 @@ export default function KnowledgeBasePage() {
     api.delete(`/knowledge/${id}`).then(load).catch(console.error);
   };
 
+  const handleUpload = async () => {
+    if (!uploadFile) { setError('Выберите файл'); return; }
+    const allowed = ['.pdf', '.docx', '.txt', '.md'];
+    const ext = '.' + uploadFile.name.split('.').pop()?.toLowerCase();
+    if (!allowed.includes(ext)) {
+      setError(`Неподдерживаемый формат. Допустимы: ${allowed.join(', ')}`);
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress('Загрузка...');
+    setError('');
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+    formData.append('category', uploadCategory);
+    if (uploadTitle) formData.append('title', uploadTitle);
+
+    try {
+      const res = await api.post('/knowledge/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setUploadProgress(`Готово! Извлечено ${res.data.content_length} символов`);
+      setTimeout(() => {
+        setUploadOpen(false);
+        setUploadFile(null);
+        setUploadTitle('');
+        setUploadProgress('');
+        setUploading(false);
+        load();
+      }, 1500);
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Ошибка загрузки');
+      setUploading(false);
+      setUploadProgress('');
+    }
+  };
+
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
 
   return (
@@ -87,9 +134,17 @@ export default function KnowledgeBasePage() {
             Информация, которую GPT учитывает при анализе звонков
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openNew} disableElevation sx={{ bgcolor: '#3b82f6', textTransform: 'none', borderRadius: 1.5 }}>
-          Добавить
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined" startIcon={<UploadFileIcon />} onClick={() => { setUploadOpen(true); setError(''); setUploadFile(null); setUploadTitle(''); }}
+            disableElevation sx={{ textTransform: 'none', borderRadius: 1.5, borderColor: '#d1d5db', color: '#374151' }}
+          >
+            Загрузить файл
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openNew} disableElevation sx={{ bgcolor: '#3b82f6', textTransform: 'none', borderRadius: 1.5 }}>
+            Добавить вручную
+          </Button>
+        </Box>
       </Box>
 
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -155,6 +210,7 @@ export default function KnowledgeBasePage() {
         </TableContainer>
       </Paper>
 
+      {/* Text entry dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>{editId ? 'Редактировать запись' : 'Новая запись'}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -181,6 +237,52 @@ export default function KnowledgeBasePage() {
           <Button onClick={() => setDialogOpen(false)} sx={{ textTransform: 'none', color: '#6b7280' }}>Отмена</Button>
           <Button variant="contained" onClick={save} disableElevation sx={{ bgcolor: '#3b82f6', textTransform: 'none' }}>
             {editId ? 'Сохранить' : 'Создать'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Upload dialog */}
+      <Dialog open={uploadOpen} onClose={() => { if (!uploading) setUploadOpen(false); }} maxWidth="sm" fullWidth>
+        <DialogTitle>Загрузить документ</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Button variant="outlined" component="label" sx={{ textTransform: 'none', p: 3, borderStyle: 'dashed', borderRadius: 2 }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <UploadFileIcon sx={{ fontSize: 40, color: '#9ca3af', mb: 1 }} />
+                <Typography sx={{ color: '#374151', fontWeight: 500 }}>
+                  {uploadFile ? uploadFile.name : 'Нажмите, чтобы выбрать файл'}
+                </Typography>
+                <Typography sx={{ color: '#9ca3af', fontSize: 12, mt: 0.5 }}>
+                  PDF, DOCX, TXT, MD
+                </Typography>
+              </Box>
+              <input type="file" hidden accept=".pdf,.docx,.txt,.md" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+            </Button>
+            <TextField
+              label="Название (если не указать — из имени файла)"
+              value={uploadTitle}
+              onChange={(e) => setUploadTitle(e.target.value)}
+              size="small" fullWidth
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel>Категория</InputLabel>
+              <Select value={uploadCategory} label="Категория" onChange={(e) => setUploadCategory(e.target.value)}>
+                {CATEGORIES.map((c) => <MenuItem key={c} value={c}>{CATEGORY_LABELS[c] || c}</MenuItem>)}
+              </Select>
+            </FormControl>
+            {uploading && (
+              <Box sx={{ width: '100%' }}>
+                <LinearProgress sx={{ height: 4, borderRadius: 2 }} />
+                <Typography sx={{ fontSize: 12, color: '#6b7280', mt: 0.5 }}>{uploadProgress}</Typography>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setUploadOpen(false)} disabled={uploading} sx={{ textTransform: 'none', color: '#6b7280' }}>Отмена</Button>
+          <Button variant="contained" onClick={handleUpload} disabled={!uploadFile || uploading} disableElevation sx={{ bgcolor: '#3b82f6', textTransform: 'none' }}>
+            {uploading ? 'Загрузка...' : 'Загрузить и извлечь текст'}
           </Button>
         </DialogActions>
       </Dialog>
