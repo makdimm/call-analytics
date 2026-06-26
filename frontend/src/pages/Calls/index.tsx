@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getCalls, getCall } from '../../api/client';
 import type { Call } from '../../types';
 import { useWebSocket } from '../../contexts/WebSocketContext';
@@ -97,6 +97,7 @@ export default function CallsPage() {
   const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const { callProgress } = useWebSocket();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const selectedId = searchParams.get('selected');
@@ -164,7 +165,7 @@ export default function CallsPage() {
                     <TableRow
                       key={call.id} hover
                       sx={{ cursor: 'pointer' }}
-                      onClick={() => { setSelectedCall(call); setSearchParams({ selected: String(call.id) }); }}
+                      onClick={() => navigate(`/calls/${call.id}`)}
                     >
                       <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>
                         {call.original_filename}

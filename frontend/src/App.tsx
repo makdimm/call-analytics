@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/Login';
 import DashboardPage from './pages/Dashboard';
 import CallsPage from './pages/Calls';
+import CallDetailPage from './pages/CallDetail';
 import UsersPage from './pages/Users';
 import UploadPage from './pages/Upload';
 import GDriveSyncPage from './pages/GDriveSync';
@@ -45,6 +46,7 @@ export default function App() {
 
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/calls" element={<ProtectedRoute><CallsPage /></ProtectedRoute>} />
+          <Route path="/calls/:id" element={<ProtectedRoute><CallDetailPage /></ProtectedRoute>} />
           <Route path="/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
           <Route path="/users/:id" element={<AdminRoute><ManagerDetailPage /></AdminRoute>} />
           <Route path="/upload" element={<AdminRoute><UploadPage /></AdminRoute>} />
