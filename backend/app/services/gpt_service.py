@@ -4,40 +4,26 @@ from app.core.config import settings
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-# Cache for criteria and knowledge base (loaded fresh per analysis)
-_criteria_cache = None
-_kb_cache = None
-
 
 async def load_criteria(db_session_factory) -> list[dict]:
-    """Load all active criteria from DB for prompt building."""
     from app.models.criteria import Criteria
     from sqlalchemy import select
-
     async with db_session_factory() as db:
-        result = await db.execute(
-            select(Criteria).where(Criteria.is_active == True).order_by(Criteria.sort_order)
-        )
+        result = await db.execute(select(Criteria).where(Criteria.is_active == True).order_by(Criteria.sort_order))
         items = []
         for c in result.scalars().all():
             items.append({
-                "key": c.key,
-                "label": c.label,
-                "description": c.description or "",
-                "what_to_check": c.what_to_check or "",
+                "key": c.key, "label": c.label, "description": c.description or "",
+                "what_to_check": c.what_to_check or "", "max_score": c.max_score,
+                "good_example": c.good_example or "", "partial_example": c.partial_example or "",
                 "bad_example": c.bad_example or "",
-                "partial_example": c.partial_example or "",
-                "good_example": c.good_example or "",
-                "max_score": c.max_score,
             })
         return items
 
 
 async def load_knowledge_base(db_session_factory) -> str:
-    """Load active knowledge base entries as context string."""
     from app.models.knowledge_base import KnowledgeBase
     from sqlalchemy import select
-
     async with db_session_factory() as db:
         result = await db.execute(
             select(KnowledgeBase).where(KnowledgeBase.is_active == True)
@@ -46,19 +32,16 @@ async def load_knowledge_base(db_session_factory) -> str:
         entries = result.scalars().all()
         if not entries:
             return ""
-
     lines = ["\n--- БАЗА ЗНАНИЙ КОМПАНИИ ---"]
     for entry in entries:
-        lines.append(f"\n[{entry.category.upper()}] {entry.title}:")
-        lines.append(entry.content)
+        lines.append(f"\n[{entry.category.upper()}] {entry.title}:\n{entry.content}")
     return "\n".join(lines)
 
 
 def _build_criteria_section(criteria: list[dict]) -> str:
-    """Build the criteria evaluation section for the GPT prompt from DB data."""
     lines = []
     for i, c in enumerate(criteria, 1):
-        lines.append(f"\n{i}. **{c['label']}** ({c['key']})")
+        lines.append(f"\n{i}. **{c['label']}** ({c['key']}):")
         if c.get("description"):
             lines.append(f"   {c['description']}")
         lines.append(f"   1 (ДА) — {c.get('good_example', 'выполнено')}")
@@ -71,37 +54,85 @@ def _compute_fg_max(criteria: list[dict]) -> float:
     return sum(c.get("max_score", 1.0) for c in criteria)
 
 
+SPEAKER_INSTRUCTIONS = """
+## РАСПОЗНАВАНИЕ ГОВОРЯЩИХ (Speaker Diarization) — КРИТИЧЕСКИ ВАЖНО!
+
+Ниже дана расшифровка звонка в формате [таймштамп]: текст.
+Каждая строка — отдельный сегмент, разделённый паузой в речи.
+
+Твоя задача:
+1. Для КАЖДОГО сегмента определи speaker: "manager" или "client"
+2. Используй ПАТТЕРНЫ, а не догадки:
+
+Менеджер (manager) — ЕСЛИ:
+- Начинает разговор, представляется, задаёт первые вопросы
+- Структурирует диалог: "давайте я расскажу", "сейчас обсудим", "перейду к..."
+- Задаёт вопросы: "расскажите", "как", "что нужно", "когда планируете"
+- Презентует продукт/услугу: "у нас есть", "мы предлагаем", "отличается тем что"
+- Отрабатывает возражения: "я понимаю, но", "давайте посмотрим", "в чём разница"
+- Назначает следующий шаг: "я позвоню", "отправлю КП", "договорились"
+- Завершает звонок: "спасибо за уделенное время", "был рад пообщаться"
+
+Клиент (client) — ЕСЛИ:
+- Отвечает на вопросы менеджера: "у нас", "мы работаем", "нам нужно"
+- Описывает свою ситуацию/компанию: "занимаемся", "находимся", "используем"
+- Задаёт уточняющие вопросы: "а сколько стоит", "а какие сроки", "как это работает"
+- Высказывает сомнения/возражения: "дорого", "не сейчас", "уже есть", "надо подумать"
+- Спрашивает об условиях: "а что входит", "гарантия", "доставка"
+- Объясняет почему отказывается или тянет с решением
+- Короткие ответы: "да", "нет", "понятно", "хорошо"
+
+ВАЖНО:
+- Если сегмент ОЧЕНЬ короткий (1-3 слова) — посмотри на предыдущий диалог для контекста
+- Если не уверен — проанализируй паттерн "вопрос-ответ": кто задаёт вопросы = менеджер
+- Клиент может задавать вопросы, но они обычно про цену/сроки/условия
+- Менеджер может кратко отвечать, но он всегда ведёт диалог
+- Паузы >1.5 сек часто указывают на смену говорящего
+"""
+
+
+def _format_segments_for_prompt(segments: list[dict]) -> str:
+    """Format Whisper segments with timestamps for better speaker diarization."""
+    lines = []
+    for i, seg in enumerate(segments):
+        start = seg.get("start", 0)
+        end = seg.get("end", 0)
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        gap = seg["start"] - segments[i-1]["end"] if i > 0 else 0
+        gap_note = f" [пауза {gap:.1f}с]" if gap > 1.5 else ""
+        lines.append(f"[{start:.1f}-{end:.1f}]{gap_note}: {text}")
+    return "\n".join(lines)
+
+
 def _build_prompt(criteria: list[dict], kb_context: str) -> str:
-    """Build the complete GPT prompt with dynamic criteria and knowledge base."""
     criteria_section = _build_criteria_section(criteria)
     fg_max = _compute_fg_max(criteria)
 
-    prompt = f"""Ты — асессор (аналитик) качества продаж. Проанализируй транскрипцию звонка менеджера с клиентом.
+    prompt = f"""Ты — асессор (аналитик) качества продаж. Проанализируй звонок менеджера с клиентом.
 
 Сначала определи ТИП ЗВОНКА:
 - "new_lead" — Новая заявка, первичный звонок
-- "acceleration" — Ускорение, клиент уже в работе, нужно подтолкнуть  
+- "acceleration" — Ускорение, клиент уже в работе
 - "clarification" — Уточнение по текущему вопросу
-- "auto_answer" — Автоответ, нецелевой звонок
+- "auto_answer" — Автоответ, нецелевой
 
 ТЕПЛОТА КЛИЕНТА:
-- "cold" — холодный
-- "warm" — теплый
-- "hot" — горячий
-- "non_target" — нецелевой
+- "cold" / "warm" / "hot" / "non_target"
 
-ОЦЕНИ КАЖДЫЙ КРИТЕРИЙ по шкале: 0 = НЕТ, 0.5 = ПОЛУДА, 1 = ДА
-
+ОЦЕНИ КАЖДЫЙ КРИТЕРИЙ (0 = НЕТ, 0.5 = ПОЛУДА, 1 = ДА):
 {criteria_section}
 
 Также оцени:
-- **objection_count** — количество возражений клиента
-- **objection_types** — типы возражений: "дорого", "не сейчас", "уже есть" и т.д.
-- **manager_tone** — тон: "friendly" / "neutral" / "pushy" / "uncertain"
-- **client_tone** — тон: "interested" / "neutral" / "irritated" / "negative"
-- **crm_quality** — качество ведения CRM: 1 / 0.5 / 0
+- objection_count, objection_types
+- manager_tone: "friendly"/"neutral"/"pushy"/"uncertain"
+- client_tone: "interested"/"neutral"/"irritated"/"negative"
+- crm_quality: 1 / 0.5 / 0
 
-МАКСИМАЛЬНЫЙ FG БАЛЛ: {fg_max} (сумма всех критериев)
+МАКСИМАЛЬНЫЙ FG: {fg_max}
+
+{SPEAKER_INSTRUCTIONS}
 
 Верни ТОЛЬКО JSON:
 {{
@@ -126,34 +157,17 @@ def _build_prompt(criteria: list[dict], kb_context: str) -> str:
   "growth_areas": ["что улучшить"],
   "keywords_found": ["ключевые слова"],
   "emotions": {{
-    "manager_speech_ratio": число (0-100, процент времени менеджера)
+    "manager_speech_ratio": число (0-100, % времени менеджера)
   }},
   "conversation": [
     {{"speaker": "manager" или "client", "text": "реплика", "timestamp": число (сек от начала звонка)}}
   ],
-  // РАЗДЕЛЕНИЕ ПО ГОВОРЯЩИМ (Speaker Diarization):
-  // Внимательно проанализируй транскрипт и определи кто говорит каждую фразу.
-  // Правила для определения manager:
-  //  - Начинает звонок с приветствия
-  //  - Задаёт закрытые и открытые вопросы (как, что, почему, расскажите)
-  //  - Презентует продукт/услугу, использует термины и характеристики
-  //  - Обрабатывает возражения (да, я понимаю, но...)
-  //  - Подводит итог, назначает следующий шаг
-  //  - Структурирует диалог (давайте я расскажу, сейчас обсудим)
-  // Правила для определения client:
-  //  - Отвечает на вопросы (у нас, мы, нужно)
-  //  - Описывает свою ситуацию, компанию, потребности
-  //  - Задаёт вопросы о цене, сроках, условиях
-  //  - Высказывает сомнения, возражения (дорого, не сейчас, надо подумать)
-  //  - Соглашается или благодарит в конце
-  // Если не уверен — посмотри на паттерн вопрос-ответ. Кто задал вопрос = менеджер (обычно).
-  // Старайся определить как можно точнее. Каждая реплика должна иметь speaker.
   "client_data": {{
     "request": "запрос клиента",
     "income_source": "откуда деньги/чем зарабатывает",
     "age": "возраст или null",
     "city": "город или null",
-    "purchase_readiness": "готовность купить (высокая/средняя/низкая)",
+    "purchase_readiness": "высокая/средняя/низкая",
     "main_objections": ["главные возражения"],
     "result_timeline": "когда хочет результат"
   }}
@@ -164,43 +178,44 @@ def _build_prompt(criteria: list[dict], kb_context: str) -> str:
     return prompt
 
 
-async def analyze_transcript(transcript: str, db_factory=None) -> dict:
+async def analyze_transcript(transcript: str, db_factory=None, segments: list[dict] | None = None) -> dict:
     if not transcript or len(transcript.strip()) < 20:
         return {
             "compliance": {"score": 0, "level": "non_compliant", "details": "Слишком короткая транскрипция"},
             "summary": "Недостаточно данных для анализа",
-            "fg_score": 0,
-            "criteria_scores": {},
-            "call_type": "auto_answer",
-            "warmth": "non_target",
-            "objection_count": 0,
+            "fg_score": 0, "criteria_scores": {},
+            "call_type": "auto_answer", "warmth": "non_target", "objection_count": 0,
         }
 
-    # Load dynamic criteria and knowledge base
     criteria = await load_criteria(db_factory) if db_factory else None
     if not criteria:
-        # Fallback to default criteria if DB is empty
         criteria = [
             {"key": "greeting", "label": "Приветствие", "description": "Полное приветствие, имя, компания", "good_example": "полное с именем и компанией", "partial_example": "неполное", "bad_example": "пропущено", "max_score": 1.0},
-            {"key": "speech", "label": "Речь", "description": "Чёткая, без слов-паразитов", "good_example": "чёткая, без паразитов", "partial_example": "редкие паразиты", "bad_example": "много мусора", "max_score": 1.0},
-            {"key": "initiative", "label": "Инициатива", "description": "Управление диалогом", "good_example": "управляет диалогом", "partial_example": "иногда теряет", "bad_example": "пассивная позиция", "max_score": 2.0},
+            {"key": "speech", "label": "Речь", "description": "Чёткая, без паразитов", "good_example": "чёткая", "partial_example": "редкие паразиты", "bad_example": "много мусора", "max_score": 1.0},
+            {"key": "initiative", "label": "Инициатива", "description": "Управление диалогом", "good_example": "управляет", "partial_example": "теряет", "bad_example": "пассивная", "max_score": 2.0},
             {"key": "qualification", "label": "Квалификация", "description": "Выявление потребностей", "good_example": "достаточно вопросов", "partial_example": "недостаточно", "bad_example": "пропущена", "max_score": 2.0},
-            {"key": "pain", "label": "Боль", "description": "Вопросы на проблему клиента", "good_example": "вопросы на боль заданы", "partial_example": "клиент сам сказал", "bad_example": "не заданы", "max_score": 3.0},
-            {"key": "product", "label": "Продукт", "description": "Презентация продукта", "good_example": "с выгодами под потребности", "partial_example": "формальная", "bad_example": "отсутствует", "max_score": 3.0},
-            {"key": "expertise", "label": "Экспертность", "description": "Знание продукта, кейсы", "good_example": "кейсы и опыт", "partial_example": "недостаточная", "bad_example": "не ответил на вопросы", "max_score": 2.0},
-            {"key": "closing", "label": "Закрытие", "description": "Закрытие на сделку", "good_example": "закрыл на сделку", "partial_example": "КП/встреча", "bad_example": "не закрыл", "max_score": 2.0},
-            {"key": "push", "label": "Дожим", "description": "Отработка возражений", "good_example": "отработал с аргументами", "partial_example": "попытался", "bad_example": "согласился", "max_score": 3.0},
-            {"key": "next_step", "label": "След. шаг", "description": "Назначение следующего шага", "good_example": "с датой и временем", "partial_example": "без времени", "bad_example": "отсутствует", "max_score": 2.0},
-            {"key": "framing", "label": "Фрейминг", "description": "Подстройка под клиента", "good_example": "подстроился", "partial_example": "незначительно", "bad_example": "спорит/перебивает", "max_score": 1.0},
+            {"key": "pain", "label": "Боль", "description": "Вопросы на боль клиента", "good_example": "заданы", "partial_example": "клиент сам сказал", "bad_example": "не заданы", "max_score": 3.0},
+            {"key": "product", "label": "Продукт", "description": "Презентация с выгодами", "good_example": "с выгодами", "partial_example": "формальная", "bad_example": "отсутствует", "max_score": 3.0},
+            {"key": "expertise", "label": "Экспертность", "description": "Кейсы, опыт", "good_example": "кейсы", "partial_example": "недостаточно", "bad_example": "не ответил", "max_score": 2.0},
+            {"key": "closing", "label": "Закрытие", "description": "Закрытие на сделку", "good_example": "закрыл", "partial_example": "КП/встреча", "bad_example": "не закрыл", "max_score": 2.0},
+            {"key": "push", "label": "Дожим", "description": "Отработка возражений", "good_example": "отработал", "partial_example": "попытался", "bad_example": "согласился", "max_score": 3.0},
+            {"key": "next_step", "label": "След. шаг", "description": "Назначение следующего шага", "good_example": "с датой", "partial_example": "без времени", "bad_example": "отсутствует", "max_score": 2.0},
+            {"key": "framing", "label": "Фрейминг", "description": "Подстройка под клиента", "good_example": "подстроился", "partial_example": "незначительно", "bad_example": "спорит", "max_score": 1.0},
         ]
 
     kb_context = await load_knowledge_base(db_factory) if db_factory else ""
+
+    # Use segments with timestamps for better diarization if available
+    if segments and len(segments) > 3:
+        user_input = _format_segments_for_prompt(segments)
+    else:
+        user_input = transcript
 
     prompt = _build_prompt(criteria, kb_context)
 
     response = await client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role": "system", "content": prompt}, {"role": "user", "content": transcript}],
+        messages=[{"role": "system", "content": prompt}, {"role": "user", "content": user_input}],
         response_format={"type": "json_object"},
         temperature=0.3,
         max_tokens=2500,
@@ -209,7 +224,6 @@ async def analyze_transcript(transcript: str, db_factory=None) -> dict:
     text = response.choices[0].message.content
     result = json.loads(text)
 
-    # Ensure FG score calculation
     if "fg_score" not in result or result.get("fg_score") is None:
         cs = result.get("criteria_scores", {})
         fg_max = _compute_fg_max(criteria)

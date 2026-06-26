@@ -231,6 +231,8 @@ async def process_call(call_id: int):
             call.transcript = transcription["text"]
             call.duration_seconds = transcription.get("duration")
             call.transcript_confidence = transcription.get("confidence")
+            # Store segments for GPT speaker diarization
+            segments = transcription.get("segments", [])
             call.whisper_model = settings.WHISPER_MODEL_SIZE
             call.status = CallStatus.TRANSCRIBED
             await db.commit()
@@ -240,7 +242,7 @@ async def process_call(call_id: int):
 
             # Stage 3: Analyze with GPT
             await _broadcast_progress(call_id, "processing", 90, "Анализ GPT-4o-mini...")
-            analysis = await analyze_transcript(call.transcript, db_factory=async_session_factory)
+            analysis = await analyze_transcript(call.transcript, db_factory=async_session_factory, segments=segments)
 
             call.analysis = analysis
             call.compliance_score = analysis.get("compliance", {}).get("score")
