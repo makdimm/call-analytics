@@ -222,7 +222,41 @@ async def analyze_transcript(transcript: str, db_factory=None, segments: list[di
     )
 
     text = response.choices[0].message.content
-    result = json.loads(text)
+    # Repair common JSON issues from GPT
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError:
+        # Try to fix common GPT JSON errors
+        fixed = text
+        # Fix unterminated strings (last string before closing brace)
+        import re as _re
+        # Remove trailing commas before } and ]
+        fixed = _re.sub(r',\s*([}\]])', r'\1', fixed)
+        # Try parsing with strict=False (allows trailing commas)
+        try:
+            import json5
+            result = json5.loads(fixed)
+        except Exception:
+            try:
+                result = json.loads(fixed, strict=False)
+            except Exception:
+                # Last resort: truncate to last valid JSON and retry
+                for end_char in ['}', ']']:
+                    idx = fixed.rfind(end_char)
+                    if idx > 10:
+                        try:
+                            result = json.loads(fixed[:idx+1], strict=False)
+                            break
+                        except Exception:
+                            pass
+                else:
+                    raise
 
     if "fg_score" not in result or result.get("fg_score") is None:
         cs = result.get("criteria_scores", {})
