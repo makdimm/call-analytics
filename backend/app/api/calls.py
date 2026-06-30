@@ -1,16 +1,19 @@
 import os
 import uuid
+import asyncio
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.deps import get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.call import Call, CallStatus, ScriptCompliance
-from app.schemas.call import CallResponse, CallListResponse, CallUpdate
-from app.services.whisper_service import transcribe_audio
+from app.schemas.call import CallResponse, CallListResponse
+from app.services.whisper_service import transcribe_audio, get_progress as whisper_get_progress
 from app.services.gpt_service import analyze_transcript
+from app.services.websocket_service import manager as ws_manager
 from app.core.config import settings
 from datetime import datetime, timezone
 
@@ -26,7 +29,6 @@ async def upload_call(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Admin can upload for anyone; managers only for themselves
     if current_user.role != UserRole.ADMIN and current_user.id != manager_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Можно загружать только свои звонки")
 
@@ -52,11 +54,13 @@ async def upload_call(
     )
     db.add(call)
     await db.commit()
-    await db.refresh(call)
 
-    # Запускаем обработку в фоне
-    import asyncio
-    asyncio.create_task(process_call(call.id))
+    result = await db.execute(
+        select(Call).options(selectinload(Call.manager)).where(Call.id == call.id)
+    )
+    call = result.scalar_one()
+
+    asyncio.ensure_future(process_call(call.id))
 
     return _call_to_response(call)
 
@@ -70,23 +74,33 @@ async def list_calls(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Call)
+    # Build count query without selectinload to avoid cartesian product
+    count_query = select(func.count(Call.id))
 
     if current_user.role != UserRole.ADMIN:
-        query = query.where(Call.manager_id == current_user.id)
+        count_query = count_query.where(Call.manager_id == current_user.id)
     elif manager_id:
-        query = query.where(Call.manager_id == manager_id)
+        count_query = count_query.where(Call.manager_id == manager_id)
 
     if status_filter:
-        query = query.where(Call.status == CallStatus(status_filter))
+        count_query = count_query.where(Call.status == CallStatus(status_filter))
 
-    query = query.order_by(desc(Call.created_at))
+    total = (await db.execute(count_query)).scalar()
 
-    total_q = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(total_q)).scalar()
+    # Now fetch the actual data with selectinload
+    data_query = select(Call).options(selectinload(Call.manager))
 
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(query)
+    if current_user.role != UserRole.ADMIN:
+        data_query = data_query.where(Call.manager_id == current_user.id)
+    elif manager_id:
+        data_query = data_query.where(Call.manager_id == manager_id)
+
+    if status_filter:
+        data_query = data_query.where(Call.status == CallStatus(status_filter))
+
+    data_query = data_query.order_by(desc(Call.created_at))
+    data_query = data_query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(data_query)
     calls = result.scalars().all()
 
     return CallListResponse(items=[_call_to_response(c) for c in calls], total=total, page=page, page_size=page_size)
@@ -94,7 +108,7 @@ async def list_calls(
 
 @router.get("/{call_id}", response_model=CallResponse)
 async def get_call(call_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    result = await db.execute(select(Call).where(Call.id == call_id))
+    result = await db.execute(select(Call).options(selectinload(Call.manager)).where(Call.id == call_id))
     call = result.scalar_one_or_none()
     if not call:
         raise HTTPException(status_code=404, detail="Звонок не найден")
@@ -105,7 +119,7 @@ async def get_call(call_id: int, db: AsyncSession = Depends(get_db), current_use
 
 @router.delete("/{call_id}")
 async def delete_call(call_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
-    result = await db.execute(select(Call).where(Call.id == call_id))
+    result = await db.execute(select(Call).options(selectinload(Call.manager)).where(Call.id == call_id))
     call = result.scalar_one_or_none()
     if not call:
         raise HTTPException(status_code=404, detail="Звонок не найден")
@@ -116,8 +130,22 @@ async def delete_call(call_id: int, db: AsyncSession = Depends(get_db), current_
     return {"ok": True}
 
 
+async def _broadcast_progress(call_id: int, status: str, progress: int, stage: str = ""):
+    """Send progress update via WebSocket."""
+    try:
+        await ws_manager.broadcast({
+            "type": "call_progress",
+            "call_id": call_id,
+            "status": status,
+            "progress": progress,
+            "stage": stage,
+        })
+    except Exception:
+        pass  # WS is best-effort
+
+
 async def process_call(call_id: int):
-    """Process a call: transcribe + analyze."""
+    """Process a call: transcribe + analyze with progress updates."""
     from app.core.database import async_session_factory
 
     async with async_session_factory() as db:
@@ -127,11 +155,48 @@ async def process_call(call_id: int):
             return
 
         try:
+            # Stage 1: Loading model
             call.status = CallStatus.PROCESSING
             await db.commit()
+            await _broadcast_progress(call_id, "processing", 0, "Загрузка модели large-v3 (~1.6 GB)...")
 
-            # 1. Transcribe
-            transcription = await transcribe_audio(call.file_path)
+            import asyncio
+            await asyncio.sleep(0.5)
+            await _broadcast_progress(call_id, "processing", 2, "Модель загружена, начинаем транскрибацию...")
+            await _broadcast_progress(call_id, "processing", 5, "Транскрибация large-v3 (~5 мин на минуту аудио)...")
+
+            # Stage 2: Transcribe (runs in thread pool — non-blocking)
+            # Start a background poller for real-time progress from whisper
+            async def _poll_progress():
+                last_progress = -1
+                from app.core.database import async_session_factory as _session_factory
+                while True:
+                    progress = whisper_get_progress(call_id)
+                    if progress != last_progress:
+                        display_pct = max(5, progress)
+                        # Broadcast via WS
+                        await _broadcast_progress(
+                            call_id, "processing",
+                            display_pct,
+                            f"Транскрибация large-v3... ({display_pct}%)" if progress > 0 else "Загрузка модели large-v3 (~3.1 GB)..."
+                        )
+                        # Persist to DB every change
+                        try:
+                            async with _session_factory() as pdb:
+                                pcall = await pdb.get(Call, call_id)
+                                if pcall:
+                                    pcall.progress = display_pct
+                                    await pdb.commit()
+                        except Exception:
+                            pass
+                        last_progress = progress
+                    if progress >= 95:
+                        break
+                    await asyncio.sleep(3)
+
+            poll_task = asyncio.ensure_future(_poll_progress())
+            transcription = await transcribe_audio(call.file_path, call_id=call_id)
+            poll_task.cancel()
             call.transcript = transcription["text"]
             call.duration_seconds = transcription.get("duration")
             call.transcript_confidence = transcription.get("confidence")
@@ -139,8 +204,13 @@ async def process_call(call_id: int):
             call.status = CallStatus.TRANSCRIBED
             await db.commit()
 
-            # 2. Analyze with GPT
+            duration_min = transcription.get("duration", 0) / 60
+            await _broadcast_progress(call_id, "processing", 85, f"Расшифровка завершена ({duration_min:.1f} мин записи)")
+
+            # Stage 3: Analyze with GPT
+            await _broadcast_progress(call_id, "processing", 90, "Анализ GPT-4o-mini...")
             analysis = await analyze_transcript(call.transcript)
+
             call.analysis = analysis
             call.compliance_score = analysis.get("compliance", {}).get("score")
             compliance_level = analysis.get("compliance", {}).get("level", "non_compliant")
@@ -158,9 +228,12 @@ async def process_call(call_id: int):
             call.processed_at = datetime.now(timezone.utc)
             await db.commit()
 
+            await _broadcast_progress(call_id, "analyzed", 100, "Готово")
+
         except Exception as e:
             call.status = CallStatus.FAILED
             await db.commit()
+            await _broadcast_progress(call_id, "failed", 0, "Ошибка обработки")
             raise e
 
 
@@ -181,6 +254,7 @@ def _call_to_response(call: Call) -> CallResponse:
         emotions=call.emotions,
         keywords_found=call.keywords_found,
         objections_handled=call.objections_handled,
+        progress=call.progress,
         source=call.source,
         created_at=call.created_at,
         processed_at=call.processed_at,

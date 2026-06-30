@@ -28,6 +28,7 @@ export interface Call {
   emotions: Record<string, any> | null;
   keywords_found: string[] | null;
   objections_handled: any[] | null;
+  progress: number;
   source: string | null;
   created_at: string;
   processed_at: string | null;

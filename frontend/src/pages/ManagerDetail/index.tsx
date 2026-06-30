@@ -4,12 +4,13 @@ import { getManagerDetail } from '../../api/client';
 import type { ManagerDetail as ManagerDetailType } from '../../types';
 import {
   Box, Typography, Paper, Grid, Chip, CircularProgress, Button, Avatar,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, alpha,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
+import MicIcon from '@mui/icons-material/Mic';
 import StatCard from '../../components/StatCard';
 
 export default function ManagerDetailPage() {
@@ -22,73 +23,89 @@ export default function ManagerDetailPage() {
     if (id) getManagerDetail(Number(id)).then(setData).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress sx={{ color: '#6C5CE7' }} /></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
   if (!data) return <Typography color="error">Менеджер не найден</Typography>;
 
   const { stats, manager } = data;
 
   return (
     <Box>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/users')} sx={{ color: alpha('#fff', 0.5), mb: 2, textTransform: 'none', '&:hover': { color: '#fff' } }}>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/users')}
+        sx={{ color: '#6b7280', mb: 2, textTransform: 'none', fontSize: 13, fontWeight: 500, '&:hover': { color: '#1f2937' } }}
+      >
         К списку менеджеров
       </Button>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
-        <Avatar sx={{ width: 48, height: 48, background: 'linear-gradient(135deg, #6C5CE7, #a29bfe)', fontSize: 20, fontWeight: 700 }}>
+        <Avatar sx={{ width: 44, height: 44, bgcolor: '#3b82f6', fontSize: 18, fontWeight: 700, borderRadius: 1.5 }}>
           {manager.username[0].toUpperCase()}
         </Avatar>
         <Box>
-          <Typography variant="h4" sx={{ color: '#fff', fontWeight: 700 }}>{manager.username}</Typography>
-          <Typography variant="body2" sx={{ color: alpha('#fff', 0.4) }}>{manager.email}</Typography>
+          <Typography variant="h4" sx={{ mb: 0.25 }}>{manager.username}</Typography>
+          <Typography sx={{ color: '#6b7280', fontSize: 14 }}>{manager.email}</Typography>
         </Box>
       </Box>
 
       <Grid container spacing={2.5} sx={{ mb: 4 }}>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatCard title="Всего звонков" value={stats.total_calls} icon={<PhoneIcon />} color="#6C5CE7" />
+          <StatCard title="Всего звонков" value={stats.total_calls} icon={<PhoneIcon />} color="#3b82f6" />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatCard title="Средняя оценка" value={stats.avg_compliance ? `${Math.round(stats.avg_compliance)}%` : '-'} icon={<CheckCircleIcon />} color="#00cec9" />
+          <StatCard title="Средняя оценка" value={stats.avg_compliance ? `${Math.round(stats.avg_compliance)}%` : '-'} icon={<CheckCircleIcon />} color="#10b981" />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatCard title="Речь" value={stats.avg_talk_ratio ? `${Math.round(stats.avg_talk_ratio)}%` : '-'} icon={<PhoneIcon />} color="#fdcb6e" />
+          <StatCard title="Речь менеджера" value={stats.avg_talk_ratio ? `${Math.round(stats.avg_talk_ratio)}%` : '-'} icon={<MicIcon />} color="#f59e0b" />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <StatCard title="Нарушений" value={stats.non_compliant_count + stats.partial_count} icon={<WarningIcon />} color="#ff7675" />
+          <StatCard title="Нарушений" value={stats.non_compliant_count + stats.partial_count} icon={<WarningIcon />} color="#ef4444" />
         </Grid>
       </Grid>
 
-      <Paper sx={{
-        p: 3, borderRadius: 3,
-        background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        <Typography variant="h6" sx={{ color: '#fff', mb: 2, fontSize: 15, fontWeight: 600 }}>Звонки</Typography>
+      <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 600, color: '#1f2937', mb: 2 }}>Звонки</Typography>
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow>
-                {['Файл', 'Статус', 'Скрипт', 'Оценка', 'Дата'].map((h) => (
-                  <TableCell key={h} sx={{ color: alpha('#fff', 0.4), borderColor: 'rgba(255,255,255,0.06)', fontSize: 12 }}>{h}</TableCell>
-                ))}
+                <TableCell>Файл</TableCell>
+                <TableCell>Статус</TableCell>
+                <TableCell>Скрипт</TableCell>
+                <TableCell>Оценка</TableCell>
+                <TableCell>Дата</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {data.recent_calls.map((call) => (
-                <TableRow key={call.id} hover sx={{ cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.03)' }, '& td': { borderColor: 'rgba(255,255,255,0.04)' } }} onClick={() => navigate(`/calls?selected=${call.id}`)}>
-                  <TableCell sx={{ color: '#fff', fontSize: 13 }}>{call.filename}</TableCell>
+                <TableRow
+                  key={call.id} hover
+                  sx={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/calls?selected=${call.id}`)}
+                >
+                  <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{call.filename}</TableCell>
                   <TableCell>
-                    <Chip label={call.status === 'analyzed' ? 'Готов' : call.status} size="small" sx={{ height: 22, fontSize: 11, background: call.status === 'analyzed' ? 'rgba(0,206,201,0.15)' : 'rgba(255,255,255,0.08)', color: call.status === 'analyzed' ? '#00cec9' : alpha('#fff', 0.5) }} />
+                    <Chip
+                      label={call.status === 'analyzed' ? 'Готов' : call.status}
+                      size="small"
+                      sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: call.status === 'analyzed' ? '#ecfdf5' : '#f3f4f6', color: call.status === 'analyzed' ? '#10b981' : '#6b7280' }}
+                    />
                   </TableCell>
                   <TableCell>
                     {call.compliance && (
-                      <Chip label={call.compliance === 'compliant' ? 'По скрипту' : '~'} size="small" sx={{ height: 22, fontSize: 11, background: call.compliance === 'compliant' ? 'rgba(0,206,201,0.15)' : 'rgba(253,203,110,0.15)', color: call.compliance === 'compliant' ? '#00cec9' : '#fdcb6e' }} />
+                      <Chip
+                        label={call.compliance === 'compliant' ? 'По скрипту' : call.compliance === 'partial' ? 'Частично' : 'Не по скрипту'}
+                        size="small"
+                        sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: call.compliance === 'compliant' ? '#ecfdf5' : call.compliance === 'partial' ? '#fffbeb' : '#fef2f2', color: call.compliance === 'compliant' ? '#10b981' : call.compliance === 'partial' ? '#f59e0b' : '#ef4444' }}
+                      />
                     )}
                   </TableCell>
-                  <TableCell sx={{ color: call.compliance_score != null && call.compliance_score >= 70 ? '#00cec9' : '#fdcb6e', fontSize: 13, fontWeight: 600 }}>
+                  <TableCell sx={{ fontWeight: 600, color: call.compliance_score != null && call.compliance_score >= 70 ? '#10b981' : call.compliance_score != null && call.compliance_score >= 40 ? '#f59e0b' : call.compliance_score != null ? '#ef4444' : '#9ca3af' }}>
                     {call.compliance_score != null ? `${Math.round(call.compliance_score)}%` : '-'}
                   </TableCell>
-                  <TableCell sx={{ color: alpha('#fff', 0.4), fontSize: 12 }}>{new Date(call.created_at).toLocaleString('ru')}</TableCell>
+                  <TableCell sx={{ color: '#9ca3af' }}>
+                    {new Date(call.created_at).toLocaleString('ru')}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

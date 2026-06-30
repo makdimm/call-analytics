@@ -4,16 +4,19 @@ import { getUsers, getDashboard } from '../../api/client';
 import type { User, DashboardStats } from '../../types';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Chip, CircularProgress, alpha,
+  TableRow, Chip, CircularProgress,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const ChartTooltip = ({ active, payload }: any) => {
+const ChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
     return (
-      <Paper sx={{ p: 1.5, background: 'rgba(18,18,48,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <Paper sx={{ p: 1.5, border: '1px solid #e5e7eb' }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#4b5563', mb: 0.5 }}>{label}</Typography>
         {payload.map((p: any, i: number) => (
-          <Typography key={i} variant="caption" sx={{ color: p.color, display: 'block' }}>{p.name}: {p.value}%</Typography>
+          <Typography key={i} sx={{ fontSize: 12, color: p.color, display: 'block' }}>
+            {p.name}: {p.value}%
+          </Typography>
         ))}
       </Paper>
     );
@@ -34,7 +37,7 @@ export default function UsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress sx={{ color: '#6C5CE7' }} /></Box>;
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
 
   const chartData = (stats?.manager_stats || []).map((m) => ({
     name: m.manager_name,
@@ -46,42 +49,37 @@ export default function UsersPage() {
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ color: '#fff', mb: 0.5 }}>Менеджеры</Typography>
-        <Typography variant="body2" sx={{ color: alpha('#fff', 0.4) }}>{users.length} человек</Typography>
+        <Typography variant="h4" sx={{ mb: 0.5 }}>Менеджеры</Typography>
+        <Typography sx={{ color: '#6b7280', fontSize: 14 }}>{users.length} человек</Typography>
       </Box>
 
       {chartData.length > 0 && (
-        <Paper sx={{
-          p: 3, mb: 3, borderRadius: 3,
-          background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.06)',
-        }}>
-          <Typography variant="h6" sx={{ color: '#fff', mb: 2, fontSize: 15, fontWeight: 600 }}>Сравнение</Typography>
+        <Paper sx={{ p: 3, mb: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 600, color: '#1f2937', mb: 2 }}>Сравнение</Typography>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="name" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 12 }} />
-              <YAxis domain={[0, 100]} stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="score" fill="#6C5CE7" radius={[6, 6, 0, 0]} name="Скрипт" />
-              <Bar dataKey="talk" fill="#00cec9" radius={[6, 6, 0, 0]} name="Речь" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="name" stroke="#9ca3af" tick={{ fontSize: 12 }} />
+              <YAxis domain={[0, 100]} stroke="#9ca3af" tick={{ fontSize: 12 }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f9fafb' }} />
+              <Bar dataKey="score" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Скрипт" />
+              <Bar dataKey="talk" fill="#10b981" radius={[4, 4, 0, 0]} name="Речь" />
             </BarChart>
           </ResponsiveContainer>
         </Paper>
       )}
 
-      <Paper sx={{
-        borderRadius: 3, overflow: 'hidden',
-        background: 'rgba(18,18,48,0.6)', backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}>
+      <Paper sx={{ border: '1px solid #e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                {['Имя', 'Email', 'Звонков', 'Скрипт', 'Речь', 'Статус'].map((h) => (
-                  <TableCell key={h} sx={{ color: alpha('#fff', 0.4), borderColor: 'rgba(255,255,255,0.06)', fontSize: 12, fontWeight: 500 }}>{h}</TableCell>
-                ))}
+                <TableCell>Имя</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Звонков</TableCell>
+                <TableCell>Скрипт</TableCell>
+                <TableCell>Речь</TableCell>
+                <TableCell>Статус</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -90,12 +88,16 @@ export default function UsersPage() {
                 return (
                   <TableRow
                     key={u.id} hover
-                    sx={{ cursor: 'pointer', '&:hover': { background: 'rgba(255,255,255,0.03)' }, '& td': { borderColor: 'rgba(255,255,255,0.04)' } }}
+                    sx={{ cursor: 'pointer' }}
                     onClick={() => navigate(`/users/${u.id}`)}
                   >
-                    <TableCell><Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{u.username}</Typography></TableCell>
-                    <TableCell sx={{ color: alpha('#fff', 0.5), fontSize: 13 }}>{u.email}</TableCell>
-                    <TableCell sx={{ color: alpha('#fff', 0.7), fontSize: 13 }}>{ms?.processed_calls ?? 0} / {ms?.total_calls ?? 0}</TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                        {u.username}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: '#4b5563' }}>{u.email}</TableCell>
+                    <TableCell sx={{ color: '#4b5563' }}>{ms?.processed_calls ?? 0} / {ms?.total_calls ?? 0}</TableCell>
                     <TableCell>
                       {ms?.avg_compliance != null ? (
                         <Chip
@@ -103,18 +105,18 @@ export default function UsersPage() {
                           size="small"
                           sx={{
                             height: 22, fontSize: 11, fontWeight: 600,
-                            background: ms.avg_compliance >= 70 ? 'rgba(0,206,201,0.15)' : ms.avg_compliance >= 40 ? 'rgba(253,203,110,0.15)' : 'rgba(255,118,117,0.15)',
-                            color: ms.avg_compliance >= 70 ? '#00cec9' : ms.avg_compliance >= 40 ? '#fdcb6e' : '#ff7675',
+                            bgcolor: ms.avg_compliance >= 70 ? '#ecfdf5' : ms.avg_compliance >= 40 ? '#fffbeb' : '#fef2f2',
+                            color: ms.avg_compliance >= 70 ? '#10b981' : ms.avg_compliance >= 40 ? '#f59e0b' : '#ef4444',
                           }}
                         />
-                      ) : <Typography sx={{ color: alpha('#fff', 0.3), fontSize: 13 }}>-</Typography>}
+                      ) : <Typography sx={{ color: '#9ca3af', fontSize: 13 }}>-</Typography>}
                     </TableCell>
-                    <TableCell sx={{ color: alpha('#fff', 0.7), fontSize: 13 }}>{ms?.avg_talk_ratio != null ? `${Math.round(ms.avg_talk_ratio)}%` : '-'}</TableCell>
+                    <TableCell sx={{ color: '#4b5563' }}>{ms?.avg_talk_ratio != null ? `${Math.round(ms.avg_talk_ratio)}%` : '-'}</TableCell>
                     <TableCell>
                       <Chip
                         label={u.is_active ? 'Активен' : 'Нет'}
                         size="small"
-                        sx={{ height: 22, fontSize: 11, background: u.is_active ? 'rgba(0,206,201,0.15)' : 'rgba(255,255,255,0.08)', color: u.is_active ? '#00cec9' : alpha('#fff', 0.4) }}
+                        sx={{ height: 22, fontSize: 11, fontWeight: 600, bgcolor: u.is_active ? '#ecfdf5' : '#f3f4f6', color: u.is_active ? '#10b981' : '#9ca3af' }}
                       />
                     </TableCell>
                   </TableRow>

@@ -1,16 +1,33 @@
+import subprocess
+import sys
+import json
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
-import bcrypt
 from app.core.config import settings
+
+_HELPER = os.path.join(os.path.dirname(__file__), "pw_verify.py")
+
+
+def _run(args: list[str]) -> dict:
+    """Run the password helper script."""
+    try:
+        r = subprocess.run(
+            [sys.executable, _HELPER] + args,
+            capture_output=True, text=True, timeout=15,
+        )
+        return json.loads(r.stdout.strip())
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError) as e:
+        return {"error": str(e)}
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    return _run(["verify", hashed_password, plain_password]).get("result", False)
 
 
 def get_password_hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return _run(["hash", password]).get("result", "")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

@@ -1,4 +1,4 @@
-import { Paper, Typography, Box, alpha } from '@mui/material';
+import { Paper, Typography, Box } from '@mui/material';
 import type { ReactNode } from 'react';
 
 interface Props {
@@ -7,46 +7,32 @@ interface Props {
   subtitle?: string;
   icon?: ReactNode;
   color?: string;
-  gradient?: string;
 }
 
-export default function StatCard({ title, value, subtitle, icon, color = '#6C5CE7', gradient }: Props) {
-  const bgGradient = gradient || `linear-gradient(135deg, ${alpha(color, 0.15)} 0%, ${alpha(color, 0.05)} 100%)`;
+export default function StatCard({ title, value, subtitle, icon, color }: Props) {
+  const accent = color || '#3b82f6';
 
   return (
-    <Paper
-      sx={{
-        p: 3,
-        borderRadius: 3,
-        background: bgGradient,
-        border: `1px solid ${alpha(color, 0.15)}`,
-        backdropFilter: 'blur(12px)',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: 'translateY(-2px)',
-          borderColor: alpha(color, 0.3),
-          boxShadow: `0 8px 32px ${alpha(color, 0.15)}`,
-        },
-      }}
-    >
+    <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box>
-          <Typography variant="caption" sx={{ color: alpha(color, 0.7), fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
+        <Box sx={{ flex: 1 }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>
             {title}
           </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: '#fff', mt: 0.5, lineHeight: 1.1 }}>
+          <Typography sx={{ fontSize: 28, fontWeight: 700, color: '#1f2937', lineHeight: 1.1, mb: subtitle ? 0.25 : 0 }}>
             {value}
           </Typography>
           {subtitle && (
-            <Typography variant="caption" sx={{ color: alpha(color, 0.5), mt: 0.5, display: 'block' }}>
+            <Typography sx={{ fontSize: 12, color: '#9ca3af' }}>
               {subtitle}
             </Typography>
           )}
         </Box>
         {icon && (
           <Box sx={{
-            p: 1.5, borderRadius: 2, background: alpha(color, 0.12),
-            color, display: 'flex', opacity: 0.8,
+            p: 1, borderRadius: 1.5, bgcolor: '#f3f4f6', color: accent,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, ml: 1,
           }}>
             {icon}
           </Box>

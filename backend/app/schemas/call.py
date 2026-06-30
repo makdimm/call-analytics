@@ -19,7 +19,8 @@ class CallResponse(BaseModel):
     talk_ratio: float | None = None
     emotions: dict | None = None
     keywords_found: list | None = None
-    objections_handled: list | None = None
+    objections_handled: dict | list | None = None
+    progress: int = 0
     source: str | None = "upload"
     created_at: datetime
     processed_at: datetime | None = None

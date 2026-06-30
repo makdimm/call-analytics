@@ -29,6 +29,9 @@ class Call(Base):
     duration_seconds = Column(Float, nullable=True)
     status = Column(SAEnum(CallStatus), default=CallStatus.UPLOADED, nullable=False)
 
+    # Progress (0-100) for real-time tracking
+    progress = Column(Integer, default=0, nullable=False)
+
     # Transcrição
     transcript = Column(Text, nullable=True)
     transcript_confidence = Column(Float, nullable=True)

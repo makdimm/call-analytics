@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # Whisper
-    WHISPER_MODEL_SIZE: str = "base"
+    WHISPER_MODEL_SIZE: str = "large-v3"
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:80"
