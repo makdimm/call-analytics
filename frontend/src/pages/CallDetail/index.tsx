@@ -4,7 +4,7 @@ import { getCall, api } from '../../api/client';
 import type { Call } from '../../types';
 import {
   Box, Typography, Paper, Grid, Chip, CircularProgress, Button, Avatar,
-  LinearProgress, Tooltip, Divider, Switch, IconButton, TextField,
+  LinearProgress, Tooltip, Divider, Switch, IconButton, TextField, Collapse,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
@@ -17,6 +17,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 
 const STATUS_LABEL: Record<string, string> = {
   analyzed: 'Проанализирован', failed: 'Ошибка', processing: 'Обработка...',
@@ -68,20 +70,38 @@ function scoreColor(s: number | null | undefined): string {
   if (s == null) return '#9ca3af'; if (s >= 70) return '#10b981'; if (s >= 40) return '#f59e0b'; return '#ef4444';
 }
 
-function CriteriaScoreBar({ score, label, desc }: { score: number; label: string; desc: string }) {
+function CriteriaScoreBar({ score, label, desc, detail }: { score: number; label: string; desc: string; detail?: string }) {
+  const [expanded, setExpanded] = useState(false);
   const pct = score * 100;
   const color = score >= 0.8 ? '#10b981' : score >= 0.4 ? '#f59e0b' : '#ef4444';
   const grade = score === 1 ? 'Да' : score === 0.5 ? 'ПолуДа' : 'Нет';
+  const bgColor = score >= 0.8 ? '#ecfdf5' : score >= 0.4 ? '#fffbeb' : '#fef2f2';
   return (
     <Box sx={{ mb: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-        <Tooltip title={desc} arrow>
-          <Typography sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{label}</Typography>
-        </Tooltip>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color }}>{grade}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Tooltip title={desc} arrow>
+            <Typography sx={{ fontSize: 14, fontWeight: 500, color: '#374151', cursor: 'help' }}>{label}</Typography>
+          </Tooltip>
+          {detail && (
+            <IconButton size="small" onClick={() => setExpanded(!expanded)}
+              sx={{ width: 18, height: 18, color: expanded ? '#3b82f6' : '#9ca3af', '&:hover': { color: '#3b82f6' } }}>
+              <InfoOutlinedIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          )}
+        </Box>
+        <Chip label={grade} size="small"
+          sx={{ height: 22, fontSize: 11, fontWeight: 700, bgcolor: bgColor, color }} />
       </Box>
       <LinearProgress variant="determinate" value={pct}
         sx={{ height: 8, borderRadius: 4, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 } }} />
+      {detail && (
+        <Collapse in={expanded}>
+          <Box sx={{ mt: 1, p: 1.5, borderRadius: 1.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+            <Typography sx={{ fontSize: 12, color: '#4b5563', lineHeight: 1.6 }}>{detail}</Typography>
+          </Box>
+        </Collapse>
+      )}
     </Box>
   );
 }
@@ -252,6 +272,7 @@ export default function CallDetailPage() {
   const a = call.analysis || {};
   const cd = call.client_data;
   const conv = call.conversation || [];
+  const criteriaDetails = a.criteria_details || {};
 
   return (
     <Box>
@@ -413,7 +434,7 @@ export default function CallDetailPage() {
             {Object.keys(cs).length > 0 ? (
               Object.entries(CRITERIA_CONFIG).map(([key, cfg]) => {
                 const val = cs[key]; if (val === undefined) return null;
-                return <CriteriaScoreBar key={key} score={val} label={cfg.label} desc={cfg.desc} />;
+                return <CriteriaScoreBar key={key} score={val} label={cfg.label} desc={cfg.desc} detail={criteriaDetails[key] || undefined} />;
               })
             ) : <Typography sx={{ color: '#9ca3af' }}>Нет данных</Typography>}
           </Paper>
@@ -491,24 +512,59 @@ export default function CallDetailPage() {
           {/* Strengths & Growth */}
           {(call.strengths?.length || call.growth_areas?.length) && (
             <Paper sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: 2 }}>
-              <Grid container spacing={2}>
-                {call.strengths && call.strengths.length > 0 && (
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#166534', mb: 1.5 }}>✅ Сильные стороны</Typography>
-                    <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {call.strengths.map((s, i) => (<li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>))}
-                    </ul>
-                  </Grid>
-                )}
-                {call.growth_areas && call.growth_areas.length > 0 && (
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#92400e', mb: 1.5 }}>📈 Что улучшить</Typography>
-                    <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {call.growth_areas.map((s, i) => (<li key={i}><Typography sx={{ fontSize: 13, color: '#374151', mb: 0.75 }}>{s}</Typography></li>))}
-                    </ul>
-                  </Grid>
-                )}
-              </Grid>
+              {/* Growth Areas / Recommendations first — primary focus */}
+              {call.growth_areas && call.growth_areas.length > 0 && (
+                <Box sx={{ mb: call.strengths?.length ? 3 : 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <LightbulbOutlinedIcon sx={{ fontSize: 20, color: '#f59e0b' }} />
+                    <Typography sx={{ fontSize: 16, fontWeight: 600, color: '#92400e' }}>
+                      Рекомендации менеджеру
+                    </Typography>
+                    <Chip label={`${call.growth_areas.length} советов`} size="small"
+                      sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: '#fffbeb', color: '#92400e', ml: 1 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {call.growth_areas.map((s, i) => (
+                      <Paper key={i} variant="outlined" sx={{
+                        p: 2, borderRadius: 2,
+                        border: '1px solid #fde68a',
+                        bgcolor: '#fffbeb',
+                        borderLeft: '4px solid #f59e0b',
+                      }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#f59e0b', flexShrink: 0, mt: '1px' }}>
+                            {i + 1}.
+                          </Typography>
+                          <Typography sx={{ fontSize: 13, color: '#78350f', lineHeight: 1.65 }}>
+                            {s}
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              {/* Strengths */}
+              {call.strengths && call.strengths.length > 0 && (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#166534' }}>
+                      ✅ Что сделано хорошо
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {call.strengths.map((s, i) => (
+                      <Chip key={i} label={s} size="small"
+                        sx={{
+                          height: 'auto', py: 0.5,
+                          fontSize: 12, fontWeight: 500, color: '#166534',
+                          bgcolor: '#ecfdf5', border: '1px solid #a7f3d0',
+                          '& .MuiChip-label': { whiteSpace: 'normal', display: 'block' },
+                        }} />
+                    ))}
+                  </Box>
+                </Box>
+              )}
             </Paper>
           )}
         </Grid>
