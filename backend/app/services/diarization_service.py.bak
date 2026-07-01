@@ -1,0 +1,177 @@
+"""
+Speaker diarization service for call-analytics.
+Uses pyannote.audio for real speaker diarization by voice.
+"""
+import asyncio
+import logging
+import os
+import tempfile
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Lazy import — pyannote pulls heavy torch deps
+_pipeline = None
+_pipeline_lock = asyncio.Lock()
+
+
+def _get_pipeline():
+    global _pipeline
+    if _pipeline is not None:
+        return _pipeline
+    
+    from pyannote.audio import Pipeline
+    
+    # Use pretrained speaker diarization pipeline
+    # Authentication is not required for pyannote/speaker-diarization-3.1
+    pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.1",
+        use_auth_token=None,
+    )
+    # Move to CPU explicitly
+    pipeline.to(__import__('torch').device("cpu"))
+    _pipeline = pipeline
+    return pipeline
+
+
+async def diarize(audio_path: str | None, whisper_segments: list[dict]) -> list[dict]:
+    """
+    Main entry point: diarize a call audio.
+    
+    1. If audio file exists → run pyannote speaker diarization
+    2. Merge pyannote speaker labels with Whisper segments by timestamp
+    3. First speaker = manager, second = client
+    
+    Args:
+        audio_path: path to audio file on disk
+        whisper_segments: [{start, end, text}] from Whisper
+    
+    Returns:
+        [{speaker, text, timestamp}] with speaker labels
+    """
+    if not whisper_segments:
+        return []
+    
+    valid = [s for s in whisper_segments if s.get("text", "").strip()]
+    if not valid:
+        return []
+    
+    # Try pyannote first if we have audio
+    pyannote_segments = None
+    if audio_path and os.path.exists(audio_path):
+        try:
+            logger.info("Starting pyannote diarization...")
+            pyannote_segments = await _run_pyannote(audio_path)
+            logger.info(f"pyannote found {len(pyannote_segments)} speaker segments")
+        except Exception as e:
+            logger.warning(f"pyannote failed: {e}, falling back to pause heuristic")
+    
+    if pyannote_segments and len(pyannote_segments) > 2:
+        # Merge pyannote labels with whisper text
+        result = _merge(valid, pyannote_segments)
+        logger.info(f"pyannote diarization: {sum(1 for c in result if c['speaker']=='manager')} manager, {sum(1 for c in result if c['speaker']=='client')} client")
+        return result
+    
+    # Fallback: simple pause heuristic
+    logger.info("Using pause heuristic fallback")
+    return _heuristic(valid)
+
+
+async def _run_pyannote(audio_path: str) -> list[dict]:
+    """Run pyannote speaker diarization pipeline in thread pool."""
+    loop = asyncio.get_running_loop()
+    
+    def _run():
+        pipeline = _get_pipeline()
+        
+        # Apply the pipeline to the audio file
+        diarization = pipeline(audio_path)
+        
+        # Map pyannote speakers to manager/client
+        speaker_labels = {}
+        segments = []
+        
+        for segment, _, speaker in diarization.itertracks(yield_label=True):
+            if speaker not in speaker_labels:
+                idx = len(speaker_labels)
+                speaker_labels[speaker] = "manager" if idx == 0 else "client"
+            
+            segments.append({
+                "speaker": speaker_labels[speaker],
+                "start": float(segment.start),
+                "end": float(segment.end),
+                "text": "",  # Will be filled during merge
+            })
+        
+        # Sort by start time
+        segments.sort(key=lambda s: s["start"])
+        return segments
+    
+    return await loop.run_in_executor(None, _run)
+
+
+def _merge(whisper_segments: list[dict], pyannote_segments: list[dict]) -> list[dict]:
+    """
+    Merge Whisper text segments with pyannote speaker labels.
+    Each Whisper segment gets the speaker of the pyannote segment with most time overlap.
+    """
+    if not pyannote_segments:
+        return _heuristic(whisper_segments)
+    
+    result = []
+    for ws in whisper_segments:
+        w_start = ws.get("start", 0)
+        w_end = ws.get("end", w_start + 1)
+        w_text = ws.get("text", "").strip()
+        if not w_text:
+            continue
+        
+        # Find best overlapping pyannote segment
+        best_speaker = "manager"
+        best_overlap = 0.0
+        
+        for ps in pyannote_segments:
+            p_start = ps.get("start", 0)
+            p_end = ps.get("end", p_start + 0.5)
+            
+            overlap_start = max(w_start, p_start)
+            overlap_end = min(w_end, p_end)
+            overlap = max(0.0, overlap_end - overlap_start)
+            
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_speaker = ps.get("speaker", "manager")
+        
+        result.append({
+            "speaker": best_speaker,
+            "text": w_text,
+            "timestamp": w_start,
+        })
+    
+    return result
+
+
+def _heuristic(segments: list[dict]) -> list[dict]:
+    """Fallback: simple pause-based speaker toggle."""
+    speaker = "manager"
+    result = []
+    
+    for i, seg in enumerate(segments):
+        text = seg["text"].strip()
+        start = seg.get("start", 0)
+        
+        if i > 0:
+            gap = start - segments[i-1].get("end", start)
+        else:
+            gap = 999
+        
+        if gap > 1.5:
+            speaker = "client" if speaker == "manager" else "manager"
+        
+        result.append({
+            "speaker": speaker,
+            "text": text,
+            "timestamp": start,
+        })
+    
+    return result

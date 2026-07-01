@@ -320,3 +320,119 @@ def _call_to_response(call: Call) -> CallResponse:
         client_data=analysis.get("client_data"),
         conversation=analysis.get("conversation"),
     )
+
+
+from pydantic import BaseModel
+
+class ConversationPatch(BaseModel):
+    speaker: str | None = None
+    text: str | None = None
+
+
+
+@router.post("/{call_id}/re-analyze")
+async def re_analyze_call(
+    call_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-run GPT analysis with corrected conversation."""
+    from app.services.gpt_service import analyze_transcript
+    from app.core.database import async_session_factory
+    from datetime import datetime, timezone
+    from app.models.call import ScriptCompliance
+
+    result = await db.execute(select(Call).where(Call.id == call_id))
+    call = result.scalar_one_or_none()
+    if not call:
+        raise HTTPException(status_code=404, detail="Zvonok ne najden")
+    if not call.transcript:
+        raise HTTPException(status_code=400, detail="Net transkripcii")
+
+    analysis = call.analysis or {}
+    conversation = analysis.get("conversation", [])
+
+    # Map conversation to segment format with start/end
+    mapped = [] if not conversation else [
+        {"start": c.get("timestamp", i * 2.0),
+         "end": c.get("timestamp", i * 2.0) + 2.0,
+         "text": c.get("text", "")}
+        for i, c in enumerate(conversation)
+    ]
+    if len(mapped) < 3:
+        mapped = None
+
+    new_analysis = await analyze_transcript(
+        transcript=call.transcript,
+        db_factory=async_session_factory,
+        segments=mapped,
+    )
+
+    # Preserve user-corrected speaker labels from the conversation
+    if conversation:
+        new_analysis["conversation"] = conversation
+
+    call.analysis = new_analysis
+    cl = new_analysis.get("compliance", {}).get("score")
+    call.compliance_score = cl
+    cl_level = new_analysis.get("compliance", {}).get("level", "non_compliant")
+    if isinstance(cl_level, str) and cl_level in [e.value for e in ScriptCompliance]:
+        call.script_compliance = ScriptCompliance(cl_level)
+    emotions = new_analysis.get("emotions") or {}
+    if isinstance(emotions, dict):
+        call.talk_ratio = emotions.get("manager_speech_ratio")
+    call.emotions = emotions
+    call.keywords_found = new_analysis.get("keywords_found", [])
+    call.processed_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    return {"ok": True, "fg_score": new_analysis.get("fg_score")}
+@router.patch("/{call_id}/conversation/{idx}")
+async def update_conversation_speaker(
+    call_id: int,
+    idx: int,
+    body: ConversationPatch,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update speaker label or text for a conversation utterance."""
+    result = await db.execute(select(Call).where(Call.id == call_id))
+    call = result.scalar_one_or_none()
+    if not call:
+        raise HTTPException(status_code=404, detail="Звонок не найден")
+    if current_user.role != UserRole.ADMIN and call.manager_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа")
+
+    analysis = call.analysis or {}
+    conversation = analysis.get("conversation", [])
+
+    if idx < 0 or idx >= len(conversation):
+        raise HTTPException(status_code=404, detail=f"Utterance {idx} not found (total: {len(conversation)})")
+
+    if body.speaker is not None:
+        if body.speaker not in ("manager", "client"):
+            raise HTTPException(status_code=400, detail="Speaker must be 'manager' or 'client'")
+        conversation[idx]["speaker"] = body.speaker
+
+    if body.text is not None:
+        conversation[idx]["text"] = body.text
+
+    analysis["conversation"] = conversation
+
+    # Recalculate talk_ratio
+    manager_words = sum(len(c.get("text", "").split()) for c in conversation if c.get("speaker") == "manager")
+    client_words = sum(len(c.get("text", "").split()) for c in conversation if c.get("speaker") == "client")
+    total_words = manager_words + client_words
+    if total_words > 0:
+        ratio = round(manager_words / total_words * 100, 1)
+        analysis.setdefault("emotions", {})["manager_speech_ratio"] = ratio
+        call.talk_ratio = ratio
+
+    import copy
+    from sqlalchemy.orm.attributes import flag_modified
+    # Force SQLAlchemy to detect changes in mutable JSON
+    call.analysis = copy.deepcopy(analysis)
+    flag_modified(call, "analysis")
+    await db.commit()
+
+    return {"ok": True, "idx": idx}

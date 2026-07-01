@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCall } from '../../api/client';
-import { api } from '../../api/client';
+import { getCall, api } from '../../api/client';
 import type { Call } from '../../types';
 import {
   Box, Typography, Paper, Grid, Chip, CircularProgress, Button, Avatar,
-  LinearProgress, Tooltip, Divider, Switch, IconButton,
+  LinearProgress, Tooltip, Divider, Switch, IconButton, TextField,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
@@ -14,6 +13,10 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import PersonIcon from '@mui/icons-material/Person';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const STATUS_LABEL: Record<string, string> = {
   analyzed: 'Проанализирован', failed: 'Ошибка', processing: 'Обработка...',
@@ -100,6 +103,10 @@ export default function CallDetailPage() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioCurrent, setAudioCurrent] = useState(0);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const navigate = useNavigate();
 
   const loadCall = () => {
@@ -182,6 +189,60 @@ export default function CallDetailPage() {
   const fmtTime = (s: number) => {
     const m = Math.floor(s / 60); const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  // Role toggle on avatar click
+  const toggleSpeaker = async (idx: number) => {
+    if (!call) return;
+    const conv = call.conversation || [];
+    const msg = conv[idx];
+    if (!msg) return;
+    const newSpeaker = msg.speaker === 'manager' ? 'client' : 'manager';
+    try {
+      await api.patch(`/calls/${call.id}/conversation/${idx}`, { speaker: newSpeaker });
+      loadCall();
+    } catch (e: any) {
+      console.error('Toggle speaker error:', e);
+    }
+  };
+
+  // Text editing
+  const startEdit = (idx: number, text: string) => {
+    setEditingIdx(idx);
+    setEditText(text);
+  };
+  const cancelEdit = () => {
+    setEditingIdx(null);
+    setEditText('');
+  };
+  const saveEdit = async (idx: number) => {
+    if (!call) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/calls/${call.id}/conversation/${idx}`, { text: editText });
+      setEditingIdx(null);
+      setEditText('');
+      loadCall();
+    } catch (e: any) {
+      console.error('Save edit error:', e);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Re-analyze
+  const reanalyze = async () => {
+    if (!call) return;
+    setReanalyzing(true);
+    try {
+      await api.post(`/calls/${call.id}/re-analyze`);
+      loadCall();
+    } catch (e: any) {
+      console.error('Re-analyze error:', e);
+      alert('Ошибка переанализа: ' + (e.response?.data?.detail || e.message));
+    } finally {
+      setReanalyzing(false);
+    }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
@@ -492,39 +553,106 @@ export default function CallDetailPage() {
       {/* Chat-style transcript */}
       {conv.length > 0 && (
         <Paper sx={{ borderRadius: 2, border: '1px solid #e5e7eb', overflow: 'hidden', mb: 3 }}>
-          <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb', bgcolor: '#f9fafb' }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid #e5e7eb', bgcolor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
               💬 Разговор
             </Typography>
+            <Button
+              onClick={reanalyze}
+              disabled={reanalyzing}
+              startIcon={reanalyzing ? <CircularProgress size={16} /> : <RefreshIcon />}
+              size="small"
+              sx={{ textTransform: 'none', fontSize: 12, fontWeight: 600, color: '#3b82f6', '&:hover': { bgcolor: '#eff6ff' } }}
+            >
+              {reanalyzing ? 'Анализ...' : 'Переанализировать'}
+            </Button>
           </Box>
           <Box sx={{ p: 2.5, maxHeight: 500, overflow: 'auto', bgcolor: '#fafafa' }}>
             {conv.map((msg, i) => {
               const isManager = msg.speaker === 'manager';
+              const isEditing = editingIdx === i;
               return (
                 <Box key={i} sx={{
                   display: 'flex', gap: 1.5, mb: 2,
                   flexDirection: isManager ? 'row' : 'row-reverse',
                 }}>
-                  <Avatar sx={{
-                    width: 32, height: 32, fontSize: 13, fontWeight: 600,
-                    bgcolor: isManager ? '#3b82f6' : '#10b981',
-                    borderRadius: 1.5, flexShrink: 0,
-                  }}>
-                    {isManager ? <SupportAgentIcon sx={{ fontSize: 18 }} /> : <PersonIcon sx={{ fontSize: 18 }} />}
-                  </Avatar>
+                  <Tooltip title="Нажми, чтобы сменить роль" arrow>
+                    <Avatar
+                      onClick={() => toggleSpeaker(i)}
+                      sx={{
+                        width: 32, height: 32, fontSize: 13, fontWeight: 600,
+                        bgcolor: isManager ? '#3b82f6' : '#10b981',
+                        borderRadius: 1.5, flexShrink: 0,
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s, box-shadow 0.15s',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        },
+                      }}
+                    >
+                      {isManager ? <SupportAgentIcon sx={{ fontSize: 18 }} /> : <PersonIcon sx={{ fontSize: 18 }} />}
+                    </Avatar>
+                  </Tooltip>
                   <Box sx={{
                     maxWidth: '80%',
                     p: 1.5,
                     borderRadius: 2,
                     bgcolor: isManager ? '#eff6ff' : '#f0fdf4',
                     border: `1px solid ${isManager ? '#bfdbfe' : '#bbf7d0'}`,
+                    position: 'relative',
                   }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: isManager ? '#1d4ed8' : '#15803d', mb: 0.25 }}>
-                      {isManager ? 'Менеджер' : 'Клиент'} · {formatTime(msg.timestamp)}
-                    </Typography>
-                    <Typography sx={{ fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
-                      {msg.text}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: isManager ? '#1d4ed8' : '#15803d' }}>
+                        {isManager ? 'Менеджер' : 'Клиент'} · {formatTime(msg.timestamp)}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => startEdit(i, msg.text)}
+                        sx={{ width: 20, height: 20, color: '#9ca3af', '&:hover': { color: '#3b82f6' } }}
+                      >
+                        <EditIcon sx={{ fontSize: 13 }} />
+                      </IconButton>
+                    </Box>
+                    {isEditing ? (
+                      <Box>
+                        <TextField
+                          fullWidth
+                          multiline
+                          size="small"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          sx={{
+                            mb: 1,
+                            '& .MuiInputBase-root': { fontSize: 13 },
+                          }}
+                        />
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                          <Button
+                            size="small"
+                            onClick={cancelEdit}
+                            startIcon={<CloseIcon sx={{ fontSize: 14 }} />}
+                            sx={{ textTransform: 'none', fontSize: 11, color: '#6b7280', minWidth: 'auto' }}
+                          >
+                            Отмена
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => saveEdit(i)}
+                            disabled={savingEdit}
+                            startIcon={savingEdit ? <CircularProgress size={14} /> : <CheckIcon sx={{ fontSize: 14 }} />}
+                            variant="contained"
+                            sx={{ textTransform: 'none', fontSize: 11, minWidth: 'auto', bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+                          >
+                            Сохранить
+                          </Button>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Typography sx={{ fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
+                        {msg.text}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               );
