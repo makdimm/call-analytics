@@ -189,8 +189,8 @@ SPEAKER_INSTRUCTIONS = """
 """
 
 
-def _format_segments_for_prompt(segments: list[dict]) -> str:
-    """Format Whisper segments with timestamps for better speaker diarization."""
+def _format_segments_for_prompt(segments: list[dict], trust_speakers: bool = False) -> str:
+    """Format segments with timestamps. If trust_speakers=True, include speaker labels."""
     lines = []
     for i, seg in enumerate(segments):
         start = seg.get("start", 0)
@@ -200,13 +200,33 @@ def _format_segments_for_prompt(segments: list[dict]) -> str:
             continue
         gap = seg["start"] - segments[i-1]["end"] if i > 0 else 0
         gap_note = f" [пауза {gap:.1f}с]" if gap > 1.5 else ""
-        lines.append(f"[{start:.1f}-{end:.1f}]{gap_note}: {text}")
+        if trust_speakers and seg.get("speaker"):
+            speaker = seg["speaker"].upper()
+            lines.append(f"[{start:.1f}-{end:.1f}]{{{speaker}}}{gap_note}: {text}")
+        else:
+            lines.append(f"[{start:.1f}-{end:.1f}]{gap_note}: {text}")
     return "\n".join(lines)
 
 
-def _build_prompt(criteria: list[dict], kb_context: str) -> str:
+TRUSTED_SPEAKERS_INSTRUCTIONS = """
+## РОЛИ ГОВОРЯЩИХ — УЖЕ ОПРЕДЕЛЕНЫ И ПРОВЕРЕНЫ
+
+В расшифровке каждая реплика помечена как {{MANAGER}} или {{CLIENT}}.
+Эти роли уже исправлены человеком — они ТОЧНЫЕ.
+
+НЕ ПЕРЕОПРЕДЕЛЯЙ роли! Используй указанные метки как есть.
+Твоя задача — на основе ЭТИХ ролей оценить критерии, тон, compliance и всё остальное.
+"""
+
+
+def _build_prompt(criteria: list[dict], kb_context: str, trust_speakers: bool = False) -> str:
     criteria_section = _build_criteria_section(criteria)
     fg_max = _compute_fg_max(criteria)
+
+    if trust_speakers:
+        speaker_block = TRUSTED_SPEAKERS_INSTRUCTIONS
+    else:
+        speaker_block = SPEAKER_INSTRUCTIONS
 
     prompt = f"""Ты — асессор (аналитик) качества продаж. Проанализируй звонок менеджера с клиентом.
 
@@ -230,7 +250,7 @@ def _build_prompt(criteria: list[dict], kb_context: str) -> str:
 
 МАКСИМАЛЬНЫЙ FG: {fg_max}
 
-{SPEAKER_INSTRUCTIONS}
+{speaker_block}
 
 Верни ТОЛЬКО JSON:
 {{
@@ -281,7 +301,7 @@ def _build_prompt(criteria: list[dict], kb_context: str) -> str:
     return prompt
 
 
-async def analyze_transcript(transcript: str, db_factory=None, segments: list[dict] | None = None) -> dict:
+async def analyze_transcript(transcript: str, db_factory=None, segments: list[dict] | None = None, trust_speakers: bool = False) -> dict:
     if not transcript or len(transcript.strip()) < 20:
         return {
             "compliance": {"score": 0, "level": "non_compliant", "details": "Слишком короткая транскрипция"},
@@ -310,11 +330,11 @@ async def analyze_transcript(transcript: str, db_factory=None, segments: list[di
 
     # Use segments with timestamps for better diarization if available
     if segments and len(segments) > 3:
-        user_input = _format_segments_for_prompt(segments)
+        user_input = _format_segments_for_prompt(segments, trust_speakers=trust_speakers)
     else:
         user_input = transcript
 
-    prompt = _build_prompt(criteria, kb_context)
+    prompt = _build_prompt(criteria, kb_context, trust_speakers=trust_speakers)
 
     response = await client.chat.completions.create(
         model="gpt-4o-mini",

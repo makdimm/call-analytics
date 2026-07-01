@@ -352,11 +352,12 @@ async def re_analyze_call(
     analysis = call.analysis or {}
     conversation = analysis.get("conversation", [])
 
-    # Map conversation to segment format with start/end
+    # Map conversation to segment format with start/end AND speaker labels
     mapped = [] if not conversation else [
         {"start": c.get("timestamp", i * 2.0),
          "end": c.get("timestamp", i * 2.0) + 2.0,
-         "text": c.get("text", "")}
+         "text": c.get("text", ""),
+         "speaker": c.get("speaker", "manager")}
         for i, c in enumerate(conversation)
     ]
     if len(mapped) < 3:
@@ -366,6 +367,7 @@ async def re_analyze_call(
         transcript=call.transcript,
         db_factory=async_session_factory,
         segments=mapped,
+        trust_speakers=True,
     )
 
     # Preserve user-corrected speaker labels from the conversation
