@@ -524,7 +524,10 @@ export default function CallDetailPage() {
                       sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: '#fffbeb', color: '#92400e', ml: 1 }} />
                   </Box>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {call.growth_areas.map((s, i) => (
+                    {call.growth_areas.map((s, i) => {
+                      // Strip leading number if GPT already numbered it
+                      const cleaned = s.replace(/^\d+[\.\)]\s*/, '');
+                      return (
                       <Paper key={i} variant="outlined" sx={{
                         p: 2, borderRadius: 2,
                         border: '1px solid #fde68a',
@@ -536,11 +539,12 @@ export default function CallDetailPage() {
                             {i + 1}.
                           </Typography>
                           <Typography sx={{ fontSize: 13, color: '#78350f', lineHeight: 1.65 }}>
-                            {s}
+                            {cleaned}
                           </Typography>
                         </Box>
                       </Paper>
-                    ))}
+                      );
+                    })}
                   </Box>
                 </Box>
               )}
