@@ -123,6 +123,7 @@ export default function CallDetailPage() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioCurrent, setAudioCurrent] = useState(0);
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [reanalyzing, setReanalyzing] = useState(false);
@@ -158,6 +159,7 @@ export default function CallDetailPage() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const aud = new Audio(url);
+      aud.playbackRate = playbackRate;
 
       aud.onloadedmetadata = () => {
         setAudioDuration(aud.duration);
@@ -195,6 +197,11 @@ export default function CallDetailPage() {
       audioEl.play();
       setAudioPlaying(true);
     }
+  };
+
+  const changeSpeed = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioEl) audioEl.playbackRate = rate;
   };
 
   const seekAudio = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -334,6 +341,25 @@ export default function CallDetailPage() {
             <Typography sx={{ fontSize: 12, color: '#6b7280' }}>
               {call.original_filename} · {call.duration_seconds ? `${Math.round(call.duration_seconds)}с` : ''}
             </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+            {[1, 1.5, 2].map(rate => (
+              <Button
+                key={rate}
+                size="small"
+                variant={playbackRate === rate ? 'contained' : 'outlined'}
+                onClick={() => changeSpeed(rate)}
+                sx={{
+                  minWidth: 38, px: 1, py: 0.3, fontSize: 12, fontWeight: 700,
+                  borderRadius: 1.5, textTransform: 'none',
+                  ...(playbackRate === rate
+                    ? { bgcolor: '#3b82f6', borderColor: '#3b82f6', color: '#fff', '&:hover': { bgcolor: '#2563eb' } }
+                    : { color: '#6b7280', borderColor: '#d1d5db', '&:hover': { borderColor: '#3b82f6', color: '#3b82f6' } }),
+                }}
+              >
+                {rate}x
+              </Button>
+            ))}
           </Box>
           <Divider orientation="vertical" flexItem />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
