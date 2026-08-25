@@ -37,7 +37,7 @@ services:
 
   frontend:
     build:
-      context: /opt/call-analytics/frontend
+      context: /opt/audira/frontend
       dockerfile: Dockerfile
     ports:
       - "8080:80"
@@ -47,5 +47,11 @@ services:
 
 volumes:
   pgdata:
+    name: call-analytics_pgdata
   audio_data:
+    name: call-analytics_audio_data
   upload_data:
+    name: call-analytics_upload_data
+
+# 🔒 Явные имена volume — данные сохраняются при смене project name
+# (переименование volume = риск потери данных, оставлены как были)

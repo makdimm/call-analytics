@@ -15,6 +15,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const SIDEBAR_WIDTH = 220;
@@ -101,6 +102,7 @@ const ALL_NAV_ITEMS = [
   { text: 'Drive', icon: <CloudSyncIcon />, path: '/gdrive' },
   { text: 'Критерии', icon: <SettingsIcon />, path: '/criteria-settings' },
   { text: 'База знаний', icon: <MenuBookIcon />, path: '/knowledge-base' },
+  { text: 'AI-продажи', icon: <SmartToyIcon />, path: '/ai-sales' },
 ];
 
 const NAV_ITEMS = ALL_NAV_ITEMS.slice(0, 2);
@@ -121,7 +123,7 @@ function SidebarContent({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate:
         </Avatar>
         <Box>
           <Typography sx={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2, color: '#1f2937' }}>
-            Call Analytics
+            Audira
           </Typography>
           <Typography sx={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.2 }}>
             OpenAI Whisper API + GPT
@@ -216,7 +218,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 CA
               </Avatar>
               <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1f2937', flex: 1 }}>
-                Call Analytics
+                Audira
               </Typography>
               <Avatar sx={{ width: 26, height: 26, fontSize: 10, bgcolor: '#e5e7eb', color: '#6b7280', borderRadius: 1 }}>
                 {user?.username?.[0]?.toUpperCase()}

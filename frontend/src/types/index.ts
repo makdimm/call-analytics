@@ -161,3 +161,74 @@ export interface ManagerDetail {
     created_at: string;
   }[];
 }
+
+// ═══════════════════════════════════════════
+// AI-Sales types
+// ═══════════════════════════════════════════
+
+export interface SalesScript {
+  id: number;
+  name: string;
+  description: string | null;
+  script_data: any;
+  system_prompt: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SalesContact {
+  id: number;
+  name: string | null;
+  phone: string;
+  company: string | null;
+  extra_data: any;
+  created_at: string;
+}
+
+export interface SalesCampaign {
+  id: number;
+  name: string;
+  script_id: number;
+  status: string;
+  max_calls_per_day: number;
+  call_interval_seconds: number;
+  working_hours_start: string;
+  working_hours_end: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  script: SalesScript | null;
+  contact_count: number | null;
+  call_count: number | null;
+}
+
+export interface SalesCall {
+  id: number;
+  campaign_id: number;
+  contact_id: number;
+  phone: string;
+  duration_seconds: number | null;
+  status: string;
+  result: string | null;
+  result_reason: string | null;
+  script_stage: string | null;
+  conversation: { speaker: string; text: string; timestamp?: number }[] | null;
+  summary: string | null;
+  quality_score: number | null;
+  quality_details: any;
+  client_data: any;
+  simulation_config: any;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  contact: SalesContact | null;
+}
+
+export interface SalesStats {
+  total_calls: number;
+  by_result: Record<string, number>;
+  avg_quality_score: number | null;
+  total_campaigns: number;
+  total_contacts: number;
+}

@@ -13,6 +13,11 @@ import GDriveSyncPage from './pages/GDriveSync';
 import ManagerDetailPage from './pages/ManagerDetail';
 import CriteriaSettingsPage from './pages/CriteriaSettings';
 import KnowledgeBasePage from './pages/KnowledgeBase';
+import AiSalesDashboard from './pages/AiSales/Dashboard';
+import AiSalesScripts from './pages/AiSales/Scripts';
+import AiSalesCampaignDetail from './pages/AiSales/CampaignDetail';
+import AiSalesCallDetail from './pages/AiSales/CallDetail';
+import AiSalesManualChat from './pages/AiSales/ManualChat';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -55,6 +60,13 @@ export default function App() {
           {/* New admin pages */}
           <Route path="/criteria-settings" element={<AdminRoute><CriteriaSettingsPage /></AdminRoute>} />
           <Route path="/knowledge-base" element={<AdminRoute><KnowledgeBasePage /></AdminRoute>} />
+
+          {/* AI-Sales pages */}
+          <Route path="/ai-sales" element={<AdminRoute><AiSalesDashboard /></AdminRoute>} />
+          <Route path="/ai-sales/scripts" element={<AdminRoute><AiSalesScripts /></AdminRoute>} />
+          <Route path="/ai-sales/campaigns/:id" element={<AdminRoute><AiSalesCampaignDetail /></AdminRoute>} />
+          <Route path="/ai-sales/calls/:id" element={<AdminRoute><AiSalesCallDetail /></AdminRoute>} />
+          <Route path="/ai-sales/chat" element={<AdminRoute><AiSalesManualChat /></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

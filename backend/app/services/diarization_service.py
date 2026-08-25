@@ -1,5 +1,5 @@
 """
-Speaker diarization service for call-analytics.
+Speaker diarization service for audira.
 Uses GPT-4.1-mini to label utterances as manager/client based on conversation context.
 """
 import json

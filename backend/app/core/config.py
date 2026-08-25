@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "Call Analytics"
+    APP_NAME: str = "Audira"
     DEBUG: bool = False
 
     # Database

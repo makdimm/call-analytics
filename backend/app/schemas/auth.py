@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Literal
 
 
 class Token(BaseModel):
@@ -20,4 +21,4 @@ class RegisterRequest(BaseModel):
     username: str
     email: EmailStr
     password: str
-    role: str = "manager"
+    role: Literal["manager"] = "manager"  # 🔒 админ только через создание админом/БД

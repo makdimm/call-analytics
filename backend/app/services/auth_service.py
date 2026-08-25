@@ -1,3 +1,7 @@
+import logging
+
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User, UserRole
@@ -21,7 +25,14 @@ async def register_user(db: AsyncSession, data: RegisterRequest) -> User:
         role=UserRole(data.role),
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Пользователь с таким именем или email уже существует",
+        ) from e
     await db.refresh(user)
     return user
 

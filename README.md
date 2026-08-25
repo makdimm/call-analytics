@@ -1,4 +1,4 @@
-# Call Analytics 🎯
+# Audira 🎯
 
 Транскрибация и анализ звонков менеджеров через Whisper + GPT-4o.
 
@@ -13,7 +13,7 @@
 
 ```bash
 # 1. Клонировать
-git clone https://github.com/makdimm/call-analytics.git && cd call-analytics
+git clone https://github.com/makdimm/audira.git && cd audira
 
 # 2. Настроить .env
 cp backend/.env.example backend/.env
